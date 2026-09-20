@@ -41,6 +41,54 @@ from ..config import get_settings
 logger = logging.getLogger(__name__)
 
 
+# ── JSON parser for MCP text responses ───────────────────────────────────────
+
+def _parse_mcp_json(raw: str) -> dict:
+    """
+    Extract the JSON object from an MCP text response.
+
+    MCP responses look like:
+        ```json
+        { "success": true, "data": {...}, "summary": "...", "suggestions": [...] }
+        ```
+    or just raw JSON. We scan for the outermost { } object.
+    """
+    if not raw:
+        return {}
+
+    # Strip markdown fences
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        # Drop first line (``` or ```json) and last line (```)
+        inner_lines = lines[1:]
+        if inner_lines and inner_lines[-1].strip() == "```":
+            inner_lines = inner_lines[:-1]
+        text = "\n".join(inner_lines).strip()
+
+    # Find the first complete JSON object by scanning braces
+    depth = 0
+    start = -1
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start != -1:
+                try:
+                    return json.loads(text[start: i + 1])
+                except json.JSONDecodeError:
+                    break
+
+    # Fallback: try the full text
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"raw_text": text[:500]}
+
+
 # ── Provenance wrapper ────────────────────────────────────────────────────────
 
 @dataclass
@@ -141,20 +189,12 @@ class _MCPSession:
         if self._session is None:
             raise RuntimeError("Session not open")
         result = await self._session.call_tool(tool_name, arguments=arguments)
-        # Parse the JSON content from the text response
+        # Collect all text content
         texts = [c.text for c in result.content if hasattr(c, "text")]
         if not texts:
             return {}
-        raw = texts[0]
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            if raw.endswith("```"):
-                raw = raw[: -3]
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return {"raw_text": raw}
+        raw = "\n".join(texts)
+        return _parse_mcp_json(raw)
 
     @property
     def tools(self) -> list[Any]:
@@ -180,6 +220,11 @@ class MCPInvestigationClient:
     """
 
     GRAPH_NAME = property(lambda self: get_settings().tigergraph_graph_name)
+
+    def __init__(self) -> None:
+        # Initialise state immediately so the object is always safe to call
+        self._session: _MCPSession | None = None
+        self._available: bool = False
 
     # ── Session lifecycle ─────────────────────────────────────────────────────
 
@@ -238,7 +283,10 @@ class MCPInvestigationClient:
             raw = await self._session.call_tool(tool_name, arguments)
             result.raw_data = raw
             result.success = raw.get("success", True)
-            result.evidence = raw.get("data", raw)
+            # MCP wraps results in {"success":true, "data":{...}, "summary":...}
+            # Expose data directly so callers don't have to unwrap
+            inner = raw.get("data", raw)
+            result.evidence = inner
             if not result.success:
                 result.error = raw.get("error", "tool returned success=false")
         except Exception as exc:  # noqa: BLE001
@@ -251,17 +299,16 @@ class MCPInvestigationClient:
 
     async def get_transaction(self, txn_id: str) -> ProvenanceMCPResult:
         """Run Transaction_Fraud for a specific transaction."""
-        result = await self._call(
+        return await self._call(
             "tigergraph__run_installed_query",
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "Transaction_Fraud",
-                "params": {"txn": txn_id},
+                "params": {"txn": (txn_id,)},   # 1-tuple = VERTEX<T> format
             },
             query_name="Transaction_Fraud",
             entity_ids=[txn_id],
         )
-        return result
 
     async def get_transaction_context(self, txn_id: str) -> ProvenanceMCPResult:
         """Run get_transaction_context for full neighbourhood."""
@@ -270,7 +317,7 @@ class MCPInvestigationClient:
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "get_transaction_context",
-                "params": {"txn": txn_id},
+                "params": {"txn": (txn_id,)},
             },
             query_name="get_transaction_context",
             entity_ids=[txn_id],
@@ -285,7 +332,7 @@ class MCPInvestigationClient:
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "get_customer_history",
-                "params": {"customer": customer_id, "lim": limit},
+                "params": {"customer": (customer_id,), "lim": limit},
             },
             query_name="get_customer_history",
             entity_ids=[customer_id],
@@ -298,7 +345,7 @@ class MCPInvestigationClient:
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "find_connected_cards",
-                "params": {"card": card_id},
+                "params": {"card": (card_id,)},
             },
             query_name="find_connected_cards",
             entity_ids=[card_id],
@@ -311,7 +358,7 @@ class MCPInvestigationClient:
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "find_shared_identity",
-                "params": {"txn": txn_id},
+                "params": {"txn": (txn_id,)},
             },
             query_name="find_shared_identity",
             entity_ids=[txn_id],
@@ -326,7 +373,7 @@ class MCPInvestigationClient:
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "find_prior_fraud_cases",
-                "params": {"customer": customer_id, "card": card_id},
+                "params": {"customer": (customer_id,), "card": (card_id,)},
             },
             query_name="find_prior_fraud_cases",
             entity_ids=[customer_id, card_id],
@@ -339,7 +386,7 @@ class MCPInvestigationClient:
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "find_behavioral_anomalies",
-                "params": {"card": card_id},
+                "params": {"card": (card_id,)},
             },
             query_name="find_behavioral_anomalies",
             entity_ids=[card_id],
@@ -354,7 +401,7 @@ class MCPInvestigationClient:
             {
                 "graph_name": get_settings().tigergraph_graph_name,
                 "query_name": "find_card_transactions",
-                "params": {"card": card_id, "lim": limit},
+                "params": {"card": (card_id,), "lim": limit},
             },
             query_name="find_card_transactions",
             entity_ids=[card_id],
@@ -362,11 +409,19 @@ class MCPInvestigationClient:
 
     async def get_graph_schema(self) -> ProvenanceMCPResult:
         """Get FraudCaseGraph schema via MCP."""
-        return await self._call(
+        result = await self._call(
             "tigergraph__get_graph_schema",
             {"graph_name": get_settings().tigergraph_graph_name},
             query_name="get_graph_schema",
         )
+        # Normalise: ensure VertexTypes are accessible at evidence["schema"]
+        if result.success and isinstance(result.evidence, dict):
+            raw_data = result.raw_data or {}
+            # MCP returns {"success":true,"data":{"graph_name":...,"schema":{...}}}
+            data = raw_data.get("data", raw_data)
+            schema = data.get("schema", data)
+            result.evidence = {"schema": schema, "graph_name": data.get("graph_name", "")}
+        return result
 
     async def list_installed_queries(self) -> list[str]:
         """Return list of installed query names via MCP."""
@@ -393,29 +448,37 @@ class MCPInvestigationClient:
         customer_id: str,
     ) -> tuple[list[ProvenanceMCPResult], list[str]]:
         """
-        Run all investigation-relevant queries in parallel.
+        Run all investigation-relevant queries.
+        Transaction_Fraud runs first (most critical), rest run in parallel.
         Returns (results, queries_executed).
         """
-        tasks = [
-            self.get_transaction(txn_id),
+        results: list[ProvenanceMCPResult] = []
+        queries: list[str] = []
+
+        # Transaction_Fraud must run first — it's the anchor query
+        r_txn = await self.get_transaction(txn_id)
+        if r_txn.success:
+            results.append(r_txn)
+            queries.append(r_txn.query_name)
+
+        # Rest can run in parallel
+        rest = await asyncio.gather(
             self.get_customer_history(customer_id),
             self.get_connected_cards(card_id),
             self.get_shared_identity(txn_id),
             self.get_prior_fraud_cases(customer_id, card_id),
             self.get_behavioral_anomalies(card_id),
             self.get_card_transactions(card_id),
-        ]
-        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
-        results: list[ProvenanceMCPResult] = []
-        queries: list[str] = []
-        for r in raw_results:
+            return_exceptions=True,
+        )
+        for r in rest:
             if isinstance(r, Exception):
                 logger.warning("MCP parallel call failed: %s", r)
-            elif isinstance(r, ProvenanceMCPResult):
-                if r.success:
-                    results.append(r)
-                    if r.query_name:
-                        queries.append(r.query_name)
+            elif isinstance(r, ProvenanceMCPResult) and r.success:
+                results.append(r)
+                if r.query_name:
+                    queries.append(r.query_name)
+
         return results, queries
 
 

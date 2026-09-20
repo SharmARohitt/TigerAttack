@@ -8,8 +8,10 @@ requests>=2.31.0
 
 # TigerGraph
 pyTigerGraph>=2.0.4
+tigergraph-mcp>=1.0.3   # official MCP server package
+mcp>=1.0.0              # MCP SDK (installed with tigergraph-mcp)
 
-# Vector retrieval (lightweight — no external DB needed)
+# Vector retrieval
 numpy>=2.0.0
 scikit-learn>=1.7.0
 sentence-transformers>=2.0.0

@@ -64,7 +64,6 @@ class TestMCPServerReachability:
                 return client.tool_count, client.tool_names
         count, names = asyncio.run(_test())
         assert count >= 10, f"Expected ≥10 tools, got {count}"
-        return names
 
     def test_core_investigation_tools_present(self):
         """The 3 tools we depend on must be present."""
