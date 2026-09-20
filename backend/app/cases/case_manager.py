@@ -126,3 +126,26 @@ class CaseManager:
                                     if k not in ("step", "action", "status", "timestamp")}),
                     ),
                 )
+
+    def get_audit(self, case_id: str) -> list[dict[str, Any]]:
+        with _conn() as con:
+            rows = con.execute(
+                "SELECT step, action, status, ts, data_json FROM audit_log "
+                "WHERE case_id = ? ORDER BY id",
+                (case_id,),
+            ).fetchall()
+        entries = []
+        for row in rows:
+            entry = {
+                "step": row["step"],
+                "action": row["action"],
+                "status": row["status"],
+                "timestamp": row["ts"],
+            }
+            if row["data_json"]:
+                entry.update(json.loads(row["data_json"]))
+            entries.append(entry)
+        return entries
+
+    def update_answer(self, answer: CaseAnswer) -> None:
+        self.save_answer(answer)

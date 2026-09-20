@@ -44,6 +44,7 @@ from ..rag.context_builder import InvestigationContextBuilder
 from ..rag.evidence import EvidencePack, ProvenanceItem
 from ..reports.sar_generator import SARGenerator
 from ..tigergraph.queries import TGQueries
+from ..tigergraph.mcp_client import get_mcp_investigation_client
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -57,7 +58,7 @@ class FraudAgent:
     and returns a CaseAnswer matching the Answer Format.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, mcp_client_factory=None) -> None:
         self.data = get_data_layer()
         self.tg = TGQueries()
         self.pattern_detector = PatternDetector()
@@ -69,6 +70,7 @@ class FraudAgent:
         self.sar_generator = SARGenerator()
         self._llm_available = bool(settings.llm_api_key)
         self._evidence_pack: EvidencePack | None = None  # persisted per investigation
+        self._mcp_client_factory = mcp_client_factory or get_mcp_investigation_client
 
     # ── Main entry point ──────────────────────────────────────────────────────
 
@@ -89,6 +91,7 @@ class FraudAgent:
                 "history_txns": len(state.customer_history),
                 "identity_available": state.connected_entities.get("identity") is not None,
                 "prior_cases": len(state.prior_cases),
+                "mcp_status": state.runtime.get("mcp", "UNKNOWN"),
             })
 
             # Step 2: Pattern detection (deterministic)
@@ -293,6 +296,7 @@ class FraudAgent:
             if tg_txn and tg_txn.get("T"):
                 state.connected_entities["tg_txn_context"] = tg_txn
                 state.tool_calls += 1
+                state.runtime["tigergraph"] = "CONNECTED"
 
             connected_cards = await self.tg.find_connected_cards(card_id)
             if connected_cards:
@@ -309,8 +313,66 @@ class FraudAgent:
             if shared_devs:
                 state.connected_entities["shared_devices"] = shared_devs
                 state.tool_calls += 1
+                state.runtime.setdefault("tigergraph", "CONNECTED")
         except Exception as exc:  # noqa: BLE001
             logger.info("TigerGraph legacy queries skipped: %s", exc)
+            state.runtime["tigergraph"] = "DEGRADED"
+
+        await self._gather_mcp_evidence(state)
+
+    async def _gather_mcp_evidence(self, state: InvestigationState) -> None:
+        """Use the official stdio MCP path and preserve every call outcome."""
+        if not settings.mcp_enabled:
+            state.runtime["mcp"] = "DISABLED"
+            return
+
+        try:
+            async with self._mcp_client_factory() as mcp:
+                if not mcp.available:
+                    state.runtime["mcp"] = "DEGRADED"
+                    state.mcp_calls.append({
+                        "tool_name": "",
+                        "query_name": "",
+                        "success": False,
+                        "error": "MCP session unavailable",
+                    })
+                    return
+                results, _ = await mcp.retrieve_investigation_evidence(
+                    state.flagged_txn_id, state.card_id, state.customer_id
+                )
+                # Include successful and failed results when the client exposes
+                # them; failed calls are operational evidence, not substitutes.
+                state.mcp_evidence = [r.to_dict() for r in results]
+                state.mcp_calls = [r.to_dict() for r in results]
+                state.tool_calls += len(results)
+                state.runtime["mcp"] = "AVAILABLE" if results else "DEGRADED"
+                self._audit(state.audit_trail, 1, "mcp_graph_access",
+                            "complete" if any(r.success for r in results) else "failed",
+                            {
+                                "calls": len(results),
+                                "successful_calls": sum(1 for r in results if r.success),
+                                "queries": [r.query_name for r in results if r.success],
+                            })
+                for result in results:
+                    if result.success:
+                        state.graph_evidence.append(EvidenceItem(
+                            claim=(
+                                f"MCP verified {result.query_name} result for "
+                                f"{', '.join(result.entity_ids[:3])}"
+                            ),
+                            source=EvidenceSource.graph,
+                            ref=f"mcp:{result.query_name}",
+                            entity_ids=result.entity_ids,
+                        ))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("MCP evidence gathering failed: %s", exc)
+            state.runtime["mcp"] = "FAILED"
+            state.mcp_calls.append({
+                "tool_name": "",
+                "query_name": "",
+                "success": False,
+                "error": str(exc),
+            })
 
     def _build_local_evidence(
         self,
@@ -493,6 +555,8 @@ class FraudAgent:
                 risk_score=risk.risk_score,
                 exposure_usd=state.exposure_usd,
                 num_signals=risk.evidence_count,
+                mcp_results=state.mcp_evidence,
+                runtime_status=state.runtime,
             )
             self._evidence_pack = pack
             state.tool_calls += len(pack.tg_queries_executed)
@@ -506,6 +570,10 @@ class FraudAgent:
                     ref=prov.query_name,
                     entity_ids=prov.entity_ids,
                 ))
+
+            state.runtime.update(pack.runtime_status)
+            state.policy_evidence = pack.policy_evidence
+            state.typology_evidence = pack.typology_evidence
 
             # Merge historical cases
             for hc in pack.historical_cases:
@@ -852,9 +920,18 @@ class FraudAgent:
             graph_case_id = await self.tg.write_case_to_graph(case_data)
             state.written_to_graph = bool(graph_case_id)
             state.graph_case_id = graph_case_id or ""
+            if state.written_to_graph:
+                readback = await self.tg.read_case_from_graph(graph_case_id)
+                state.validation["case_memory_readback"] = bool(
+                    readback and str(readback.get("v_id", readback.get("primary_id", graph_case_id))) == graph_case_id
+                )
+                self._audit(state.audit_trail, 10, "case_memory_readback",
+                            "complete" if state.validation["case_memory_readback"] else "failed",
+                            {"case_id": graph_case_id})
         except Exception as exc:  # noqa: BLE001
             logger.info("Graph write skipped: %s", exc)
             state.written_to_graph = False
+            state.validation["case_memory_readback"] = False
 
     # ── Answer building ───────────────────────────────────────────────────────
 
@@ -906,6 +983,21 @@ class FraudAgent:
             tool_calls=state.tool_calls,
             tokens=state.tokens,
             latency_s=round(time.monotonic() - t0, 2),
+            runtime={
+                "tigergraph": state.runtime.get("tigergraph", "DEGRADED"),
+                "mcp": state.runtime.get("mcp", "DEGRADED"),
+                "llm": "AVAILABLE" if self._llm_available else "DEGRADED",
+                "graphrag": "AVAILABLE" if self._evidence_pack else "DEGRADED",
+            },
+            audit=state.audit_trail,
+            validation=state.validation,
+            case_memory={
+                "written": state.written_to_graph,
+                "graph_case_id": state.graph_case_id,
+                "readback": state.validation.get("case_memory_readback", False),
+            },
+            policy_evidence=state.policy_evidence,
+            typology_evidence=state.typology_evidence,
         )
 
     def _generate_summary(self, state: InvestigationState, exposure) -> str:

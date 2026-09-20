@@ -188,6 +188,10 @@ class TGQueries:
             logger.warning("Graph case write failed: %s", exc)
         return ""
 
+    async def read_case_from_graph(self, case_id: str) -> dict | None:
+        """Read a persisted FraudCase vertex for write/readback verification."""
+        return await self.tg.async_get_vertex("FraudCase", case_id)
+
     # ── Graph algorithms ──────────────────────────────────────────────────────
 
     async def run_community_detection(self, card_id: str) -> dict[str, Any]:

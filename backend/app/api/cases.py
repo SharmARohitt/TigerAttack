@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 from ..cases.case_manager import CaseManager
-from ..models.case import CaseAnswer
+from ..models.case import CaseAnswer, ActionType
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 _mgr = CaseManager()
@@ -69,12 +69,36 @@ async def get_graph(case_id: str):
     }
 
 
+@router.get("/{case_id}/audit")
+async def get_audit(case_id: str):
+    if not _mgr.get_answer(case_id):
+        raise HTTPException(404, f"Case {case_id} not found")
+    return {"case_id": case_id, "audit": _mgr.get_audit(case_id)}
+
+
 @router.post("/{case_id}/actions/{action_id}/approve")
 async def approve_action(case_id: str, action_id: str):
     ans = _mgr.get_answer(case_id)
     if not ans:
         raise HTTPException(404, f"Case {case_id} not found")
-    return {"approved": True, "case_id": case_id, "action": action_id}
+    try:
+        ActionType(action_id)
+    except ValueError as exc:
+        raise HTTPException(400, f"Unknown action: {action_id}") from exc
+    available = {a.action.value for a in ans.next_best_actions.final}
+    if action_id not in available:
+        raise HTTPException(409, f"Action {action_id} is not recommended for this case")
+    ans.action_decisions[action_id] = {
+        "status": "approved",
+        "execution_mode": "SIMULATED",
+    }
+    _mgr.update_answer(ans)
+    _mgr.log_audit(case_id, [{
+        "step": 12, "action": "approval", "status": "approved",
+        "action_id": action_id, "execution_mode": "SIMULATED",
+    }])
+    return {"approved": True, "case_id": case_id, "action": action_id,
+            "execution_mode": "SIMULATED"}
 
 
 @router.post("/{case_id}/actions/{action_id}/reject")
@@ -82,4 +106,15 @@ async def reject_action(case_id: str, action_id: str):
     ans = _mgr.get_answer(case_id)
     if not ans:
         raise HTTPException(404, f"Case {case_id} not found")
+    if action_id not in {a.action.value for a in ans.next_best_actions.final}:
+        raise HTTPException(409, f"Action {action_id} is not recommended for this case")
+    ans.action_decisions[action_id] = {
+        "status": "rejected",
+        "execution_mode": "SIMULATED",
+    }
+    _mgr.update_answer(ans)
+    _mgr.log_audit(case_id, [{
+        "step": 12, "action": "approval", "status": "rejected",
+        "action_id": action_id, "execution_mode": "SIMULATED",
+    }])
     return {"rejected": True, "case_id": case_id, "action": action_id}

@@ -323,7 +323,10 @@ class TigerGraphClient:
     def get_vertex(self, vtype: str, vid: str) -> dict | None:
         self._ensure_conn()
         try:
-            results = self._conn.getVertices(vtype, where=f'primary_id=="{vid}"')
+            # This graph exposes the application case identifier as an
+            # attribute; the SDK version in use has no getVertex-by-ID API.
+            where = f'case_id=="{vid}"' if vtype == "FraudCase" else f'v_id=="{vid}"'
+            results = self._conn.getVertices(vtype, where=where, limit=1)
             return results[0] if results else None
         except Exception:  # noqa: BLE001
             return None
@@ -353,11 +356,20 @@ class TigerGraphClient:
         self, query_name: str, params: dict | None = None
     ) -> list[Any]:
         import asyncio
-        return await asyncio.to_thread(self.run_query, query_name, params)
+        # Keep async calls on the same VERTEX<T> contract as run_query().
+        fixed_params = {
+            key: (value,) if isinstance(value, str) else value
+            for key, value in (params or {}).items()
+        }
+        return await asyncio.to_thread(self.run_query, query_name, fixed_params)
 
     async def async_upsert_vertex(self, vtype: str, vid: str, attrs: dict) -> bool:
         import asyncio
         return await asyncio.to_thread(self.upsert_vertex, vtype, vid, attrs)
+
+    async def async_get_vertex(self, vtype: str, vid: str) -> dict | None:
+        import asyncio
+        return await asyncio.to_thread(self.get_vertex, vtype, vid)
 
     async def async_upsert_edge(
         self,

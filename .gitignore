@@ -33,3 +33,5 @@ Datasets/*.csv
 .DS_Store
 Thumbs.db
 .vscode/
+validation_reports/
+validator_output.txt

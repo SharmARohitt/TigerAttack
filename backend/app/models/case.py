@@ -141,6 +141,13 @@ class CaseAnswer(BaseModel):
     tool_calls: int = 0
     tokens: int = 0
     latency_s: float = 0.0
+    runtime: dict[str, str] = Field(default_factory=dict)
+    audit: list[dict[str, Any]] = Field(default_factory=list)
+    validation: dict[str, Any] = Field(default_factory=dict)
+    case_memory: dict[str, Any] = Field(default_factory=dict)
+    action_decisions: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    policy_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    typology_evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ── Internal investigation state (not in the answer file) ────────────────────
@@ -197,3 +204,9 @@ class InvestigationState(BaseModel):
     # Graph write
     written_to_graph: bool = False
     graph_case_id: str = ""
+    runtime: dict[str, str] = Field(default_factory=dict)
+    validation: dict[str, Any] = Field(default_factory=dict)
+    mcp_calls: list[dict[str, Any]] = Field(default_factory=list)
+    mcp_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    policy_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    typology_evidence: list[dict[str, Any]] = Field(default_factory=list)

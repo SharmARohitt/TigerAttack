@@ -71,6 +71,8 @@ class InvestigationContextBuilder:
         risk_score:    float = 0.0,
         exposure_usd:  float = 0.0,
         num_signals:   int   = 0,
+        mcp_results: list[dict[str, Any]] | None = None,
+        runtime_status: dict[str, str] | None = None,
     ) -> EvidencePack:
         """
         Build a full EvidencePack for one investigation.
@@ -101,6 +103,28 @@ class InvestigationContextBuilder:
         pack.tg_queries_executed = tg_queries
         pack.tg_items_retrieved  = len(tg_evidence)
         pack.uncertainties.extend(tg_uncertainties)
+        pack.runtime_status.update(runtime_status or {})
+
+        # MCP is an agent-facing graph access path. Its results are kept
+        # separate from direct pyTigerGraph evidence so provenance is explicit.
+        mcp_items = self._build_mcp_evidence(mcp_results or [])
+        pack.mcp_evidence = mcp_items
+        pack.mcp_calls = [
+            {
+                "tool_name": r.get("tool_name", ""),
+                "query_name": r.get("query_name", ""),
+                "entity_ids": r.get("entity_ids", []),
+                "success": bool(r.get("success")),
+                "error": r.get("error", ""),
+                "retrieved_at": r.get("retrieved_at", ""),
+                "duration_ms": r.get("duration_ms", 0),
+            }
+            for r in (mcp_results or [])
+        ]
+        if mcp_results and not mcp_items:
+            pack.evidence_gaps.append(
+                "MCP calls completed without verified evidence"
+            )
 
         logger.info("[%s] TigerGraph: %d items from %d queries",
                     case_id, len(tg_evidence), len(tg_queries))
@@ -113,7 +137,7 @@ class InvestigationContextBuilder:
         for item in csv_evidence:
             item.confidence = 0.85
 
-        all_evidence = tg_evidence + csv_evidence
+        all_evidence = tg_evidence + mcp_items + csv_evidence
 
         # ── 3. Check if connected cards detected ──────────────────────────────
         has_shared_device = any(
@@ -144,6 +168,11 @@ class InvestigationContextBuilder:
             e for e in ranked
             if e.entity_type == EntityType.behavioral
         ][:5]
+
+        pack.mcp_evidence = [
+            item for item in ranked if item.source_type == SourceType.tigergraph
+            and item.query_name.startswith("mcp:")
+        ][:10]
 
         # ── 5. Historical-case retrieval (similarity search) ──────────────────
         self._ensure_index()
@@ -230,6 +259,7 @@ class InvestigationContextBuilder:
         # ── 9. Final metadata ─────────────────────────────────────────────────
         pack.total_evidence_items = (
             len(pack.graph_evidence)
+            + len(pack.mcp_evidence)
             + len(pack.historical_cases)
             + len(pack.policy_evidence)
             + len(pack.typology_evidence)
@@ -245,6 +275,39 @@ class InvestigationContextBuilder:
         )
 
         return pack
+
+    @staticmethod
+    def _build_mcp_evidence(results: list[dict[str, Any]]) -> list[ProvenanceItem]:
+        """Convert only successful, provenance-bearing MCP results to evidence."""
+        evidence: list[ProvenanceItem] = []
+        for result in results:
+            if not result.get("success"):
+                continue
+            query_name = str(result.get("query_name", ""))
+            tool_name = str(result.get("tool_name", ""))
+            entity_ids = [str(v) for v in result.get("entity_ids", []) if v]
+            data = result.get("evidence")
+            if not isinstance(data, dict):
+                data = {"result": data}
+            summary = data.get("summary") or data.get("message") or "verified result"
+            evidence.append(ProvenanceItem(
+                claim=f"MCP {query_name or tool_name}: {str(summary)[:300]}",
+                source_type=SourceType.tigergraph,
+                entity_type=EntityType.transaction if query_name == "Transaction_Fraud"
+                    else EntityType.behavioral if "behavior" in query_name
+                    else EntityType.card if "card" in query_name
+                    else EntityType.customer if "customer" in query_name
+                    else EntityType.fraud_case if "fraud" in query_name
+                    else EntityType.transaction,
+                entity_ids=entity_ids,
+                query_name=f"mcp:{query_name or tool_name}",
+                relationship="mcp_verified_graph_result",
+                raw_data={"tool_name": tool_name, "data": data},
+                relevance_score=0.95,
+                confidence=1.0,
+                evidence_type="observed_fact",
+            ))
+        return evidence
 
     # ── CSV gap-fill evidence ─────────────────────────────────────────────────
 

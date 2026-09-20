@@ -32,6 +32,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -102,6 +103,9 @@ class ProvenanceMCPResult:
     raw_data: Any = None
     success: bool = False
     error: str = ""
+    started_at: str = ""
+    completed_at: str = ""
+    duration_ms: float = 0.0
     retrieved_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -116,6 +120,9 @@ class ProvenanceMCPResult:
             "success":      self.success,
             "error":        self.error,
             "retrieved_at": self.retrieved_at,
+            "started_at":   self.started_at,
+            "completed_at": self.completed_at,
+            "duration_ms":  self.duration_ms,
         }
 
 
@@ -275,8 +282,12 @@ class MCPInvestigationClient:
             query_name=query_name,
             entity_ids=entity_ids or [],
         )
+        started = time.monotonic()
+        result.started_at = datetime.now(timezone.utc).isoformat()
         if not self.available:
             result.error = "MCP session not available"
+            result.completed_at = datetime.now(timezone.utc).isoformat()
+            result.duration_ms = round((time.monotonic() - started) * 1000, 2)
             return result
 
         try:
@@ -292,6 +303,8 @@ class MCPInvestigationClient:
         except Exception as exc:  # noqa: BLE001
             result.error = str(exc)
             logger.warning("MCP tool %s failed: %s", tool_name, exc)
+        result.completed_at = datetime.now(timezone.utc).isoformat()
+        result.duration_ms = round((time.monotonic() - started) * 1000, 2)
 
         return result
 
@@ -457,8 +470,8 @@ class MCPInvestigationClient:
 
         # Transaction_Fraud must run first — it's the anchor query
         r_txn = await self.get_transaction(txn_id)
+        results.append(r_txn)
         if r_txn.success:
-            results.append(r_txn)
             queries.append(r_txn.query_name)
 
         # Rest can run in parallel
@@ -474,9 +487,9 @@ class MCPInvestigationClient:
         for r in rest:
             if isinstance(r, Exception):
                 logger.warning("MCP parallel call failed: %s", r)
-            elif isinstance(r, ProvenanceMCPResult) and r.success:
+            elif isinstance(r, ProvenanceMCPResult):
                 results.append(r)
-                if r.query_name:
+                if r.success and r.query_name:
                     queries.append(r.query_name)
 
         return results, queries

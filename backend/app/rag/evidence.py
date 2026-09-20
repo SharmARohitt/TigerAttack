@@ -113,11 +113,14 @@ class EvidencePack:
     total_evidence_items: int = 0
     tg_queries_executed: list[str] = field(default_factory=list)
     tg_items_retrieved: int = 0
+    mcp_evidence: list[ProvenanceItem] = field(default_factory=list)
+    mcp_calls: list[dict[str, Any]] = field(default_factory=list)
+    runtime_status: dict[str, str] = field(default_factory=dict)
     historical_cases_retrieved: int = 0
     policy_sources_retrieved: int = 0
 
     def all_evidence(self) -> list[ProvenanceItem]:
-        return self.graph_evidence + self.behavioral_evidence
+        return self.graph_evidence + self.mcp_evidence + self.behavioral_evidence
 
     def to_llm_context(self) -> dict[str, Any]:
         """
@@ -128,6 +131,7 @@ class EvidencePack:
             "case_id": self.case_id,
             "trigger": self.trigger,
             "graph_evidence": [e.to_dict() for e in self.graph_evidence[:15]],
+            "mcp_evidence": [e.to_dict() for e in self.mcp_evidence[:10]],
             "historical_cases": self.historical_cases[:5],
             "policy_evidence": self.policy_evidence[:6],
             "typology_evidence": self.typology_evidence[:3],
@@ -138,6 +142,8 @@ class EvidencePack:
             "metadata": {
                 "tg_queries": self.tg_queries_executed,
                 "tg_items": self.tg_items_retrieved,
+                "mcp_calls": self.mcp_calls,
+                "runtime_status": self.runtime_status,
                 "historical_items": self.historical_cases_retrieved,
                 "policy_items": self.policy_sources_retrieved,
                 "total_items": self.total_evidence_items,

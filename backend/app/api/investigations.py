@@ -38,6 +38,7 @@ async def run_investigation(body: dict):
     agent = FraudAgent()
     answer = await agent.investigate(row)
     _mgr.save_answer(answer)
+    _mgr.log_audit(answer.case_id, answer.audit)
     return answer
 
 
@@ -54,6 +55,7 @@ async def run_all_investigations():
         try:
             answer = await agent.investigate(row)
             _mgr.save_answer(answer)
+            _mgr.log_audit(answer.case_id, answer.audit)
             results["results"][case_id] = {
                 "status": answer.case.status.value,
                 "verdict": answer.case.verdict.value,
@@ -110,6 +112,7 @@ async def stream_investigation(case_id: str):
         agent = FraudAgent()
         answer = await agent.investigate(row)
         _mgr.save_answer(answer)
+        _mgr.log_audit(answer.case_id, answer.audit)
         yield f"data: {json.dumps({'complete': True, 'answer': json.loads(answer.model_dump_json())})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
