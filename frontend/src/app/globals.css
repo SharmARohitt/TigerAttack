@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --amber:   #F59E0B;
+  --amber-dim: #92400E;
+  --cyan:    #06B6D4;
+  --red-fx:  #EF4444;
+  --green-fx:#10B981;
+  --bg:      #080A0C;
+  --surface: #0D1117;
+  --surface2:#111820;
+  --border:  rgba(255,255,255,0.06);
+  --text:    #E2E8F0;
+  --muted:   #64748B;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', 'IBM Plex Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.25); border-radius: 2px; }
+
+/* Glass surface */
+.glass {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.glass-amber {
+  background: rgba(245,158,11,0.05);
+  border: 1px solid rgba(245,158,11,0.15);
+}
+
+/* Amber glow */
+.glow-amber { box-shadow: 0 0 20px rgba(245,158,11,0.15); }
+.glow-amber-strong { box-shadow: 0 0 40px rgba(245,158,11,0.3); }
+
+/* Scanline overlay */
+.scanlines::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Mono text */
+.mono { font-family: 'IBM Plex Mono', 'Fira Code', monospace; }
+
+/* Node pulse animation */
+@keyframes node-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.15); }
+}
+.node-pulse { animation: node-pulse 2s ease-in-out infinite; }
+
+/* Amber scan line */
+@keyframes scan {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100vh); }
+}
+.scan-line {
+  position: fixed;
+  left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,158,11,0.4), transparent);
+  animation: scan 4s linear infinite;
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* Particle drift */
+@keyframes drift {
+  from { transform: translateY(0) translateX(0); opacity: 0.4; }
+  50%  { opacity: 0.8; }
+  to   { transform: translateY(-60px) translateX(20px); opacity: 0; }
+}
+
+/* Tiger eye glow */
+@keyframes eye-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(245,158,11,0.4)); }
+  50%       { filter: drop-shadow(0 0 12px rgba(245,158,11,0.9)); }
+}
+.eye-glow { animation: eye-glow 1.8s ease-in-out infinite; }
+
+/* Graph edge draw */
+@keyframes edge-draw {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+.edge-draw {
+  stroke-dasharray: 1000;
+  animation: edge-draw 1s ease forwards;
+}
+
+/* Status dot blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.blink { animation: blink 1.6s ease-in-out infinite; }
+
+/* reduced-motion overrides */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
