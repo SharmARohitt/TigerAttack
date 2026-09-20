@@ -12,6 +12,7 @@ fraud/, policy/, and graphrag/ modules.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import hashlib
 import logging
@@ -692,11 +693,95 @@ class FraudAgent:
     ) -> dict[str, Any]:
         """Structured LLM call — returns fraud_probability and tokens."""
         provider = settings.llm_provider.lower()
+        if provider == "gemini":
+            return await self._call_gemini(state, ctx, pattern_result, risk)
         if provider == "openai":
             return await self._call_openai(state, ctx, pattern_result, risk)
         elif provider == "anthropic":
             return await self._call_anthropic(state, ctx, pattern_result, risk)
         else:
+            return self._deterministic_probability(state, pattern_result, risk)
+
+    async def _call_gemini(
+        self, state: InvestigationState, ctx: dict, pattern_result, risk
+    ) -> dict[str, Any]:
+        """Call Gemini's generateContent REST API with EvidencePack context only."""
+        import httpx
+
+        endpoint = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{settings.llm_model}:generateContent"
+        )
+        prompt = f"{self._build_system_prompt()}\n\n{self._build_user_prompt(state, ctx)}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 800,
+                "responseMimeType": "application/json",
+            },
+        }
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_timeout_s) as client:
+                response = None
+                for attempt in range(3):
+                    response = await client.post(
+                        endpoint,
+                        headers={
+                            "Content-Type": "application/json",
+                            "X-goog-api-key": settings.llm_api_key,
+                        },
+                        json=payload,
+                    )
+                    if response.status_code not in {429, 500, 502, 503, 504}:
+                        break
+                    if attempt < 2:
+                        await asyncio.sleep(2 ** attempt)
+                assert response is not None
+            response.raise_for_status()
+            body = response.json()
+            text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                # Gemini may wrap valid JSON in markdown or brief prose even
+                # when responseMimeType requests application/json.
+                start, end = text.find("{"), text.rfind("}")
+                if start < 0 or end <= start:
+                    raise
+                data = json.loads(text[start:end + 1])
+            if not isinstance(data, dict):
+                raise ValueError("Gemini response JSON must be an object")
+            accepted, grounding = validate_grounded_llm_output(ctx, data)
+            state.validation.update({
+                "llm_provider": "gemini",
+                "llm_runtime": "AVAILABLE",
+                **grounding,
+            })
+            state.graph_evidence.extend([
+                EvidenceItem(
+                    claim=item.get("claim", ""),
+                    source=EvidenceSource.document,
+                    ref="llm_reasoning",
+                    entity_ids=item.get("entity_ids", []),
+                )
+                for item in accepted
+            ])
+            return {
+                "fraud_probability": round(
+                    float(data.get("fraud_probability", risk.risk_score)), 3
+                ),
+                "tokens": 0,
+                "grounding": grounding,
+            }
+        except Exception as exc:  # noqa: BLE001
+            state.validation.update({
+                "llm_provider": "gemini",
+                "llm_runtime": "FAILED",
+                "llm_fallback_used": True,
+                "llm_error": type(exc).__name__,
+            })
+            logger.warning("Gemini call failed, using deterministic fallback: %s", exc)
             return self._deterministic_probability(state, pattern_result, risk)
 
     async def _call_openai(
@@ -1056,7 +1141,10 @@ class FraudAgent:
             runtime={
                 "tigergraph": state.runtime.get("tigergraph", "DEGRADED"),
                 "mcp": state.runtime.get("mcp", "DEGRADED"),
-                "llm": "AVAILABLE" if self._llm_available else "NOT_AVAILABLE",
+                "llm": state.validation.get(
+                    "llm_runtime",
+                    "AVAILABLE" if self._llm_available else "NOT_AVAILABLE",
+                ),
                 "graphrag": "AVAILABLE" if self._evidence_pack else "DEGRADED",
             },
             audit=state.audit_trail,

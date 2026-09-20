@@ -252,7 +252,11 @@ async def main() -> int:
         "tigergraph": "PASS" if any(c.get("runtime", {}).get("tigergraph") == "CONNECTED" for c in completed) else "DEGRADED",
         "mcp": live["mcp"].get("status", "DEGRADED"),
         "graphrag": "PASS" if completed else "FAILED",
-        "llm": "PASS" if any(c.get("runtime", {}).get("llm") == "AVAILABLE" for c in completed) else "NOT_AVAILABLE",
+        "llm": (
+            "PASS" if any(c.get("runtime", {}).get("llm") == "AVAILABLE" for c in completed)
+            else "FAILED" if any(c.get("runtime", {}).get("llm") == "FAILED" for c in completed)
+            else "NOT_AVAILABLE"
+        ),
     }
     llm_available = runtime["llm"] == "PASS"
     llm_settings = get_settings()
@@ -297,9 +301,15 @@ async def main() -> int:
         "llm": {
             "provider": llm_settings.llm_provider,
             "model": llm_settings.llm_model,
-            "runtime_availability": "PASS" if llm_available else "NOT_AVAILABLE",
-            "real_invocation": llm_available,
-            "fallback_used": not llm_available,
+            "runtime_availability": runtime["llm"],
+            "real_invocation": any(
+                c.get("grounding", {}).get("llm_runtime") in {"AVAILABLE", "FAILED"}
+                for c in completed
+            ),
+            "fallback_used": any(
+                c.get("grounding", {}).get("llm_fallback_used") is True
+                for c in completed
+            ),
             "evidencepack_only_context": all(
                 c.get("grounding", {}).get("llm_raw_dataset_in_context") is False
                 for c in completed
