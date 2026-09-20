@@ -1,0 +1,191 @@
+{
+  "case_id": "HHG-001",
+  "case": {
+    "status": "open",
+    "verdict": "uncertain",
+    "fraud_probability": 0.55,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3514030"
+    ],
+    "first_suspicious_txn_id": "3514030",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 77.07,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3514030 ($77.07, in billing region 444.0) at 0.61. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3514030",
+          "C12382-K1"
+        ]
+      },
+      {
+        "claim": "4 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-1066",
+          "CC-1673",
+          "CC-2964"
+        ]
+      },
+      {
+        "claim": "Transaction 3514030: $77.07 via in_person channel, product W, risk_score=0.61",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3514030"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3587 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3587",
+          "C12382"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1066 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1066",
+          "C12382"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2964 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2964",
+          "C12382"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1673 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1673",
+          "C12382"
+        ]
+      },
+      {
+        "claim": "Card 21139: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "21139"
+        ]
+      },
+      {
+        "claim": "Transaction 3514030: $77.07 via in_person at 2016-12-04 19:55:28, risk_score=0.61, card_network=visa (debit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3514030"
+        ]
+      },
+      {
+        "claim": "Alert: Real-time model scored transaction 3514030 ($77.07, in billing region 444.0) at 0.61. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3514030",
+          "C12382-K1"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C12382",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C12382"
+        ]
+      },
+      {
+        "claim": "Customer C12382 has 4 prior confirmed fraud case(s): ['CC-1066', 'CC-1673', 'CC-2964']",
+        "source": "document",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-1066",
+          "CC-1673",
+          "CC-2964"
+        ]
+      },
+      {
+        "claim": "Customer C12382 has 50 transaction(s) in graph: avg $113.36, max $705.34, channels=['in_person'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C12382"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C12382-K1 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C12382-K1"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-1066",
+      "CC-1673",
+      "CC-2964",
+      "CC-3587",
+      "CC-4898"
+    ],
+    "summary": "Case HHG-001: risk score on card C12382-K1 (customer C12382), $77.07 in_person transaction. Pattern assessed as none (p=0.55), verdict: uncertain. Estimated exposure: $77.07. 4 prior confirmed fraud case(s) on this customer. Evidence: 14 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-001"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 4.4
+}

@@ -1,0 +1,188 @@
+{
+  "case_id": "HHG-006",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.95,
+    "pattern": "card_not_present_new_device",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3476682",
+      "3476602",
+      "3476633",
+      "3476665"
+    ],
+    "first_suspicious_txn_id": "3476602",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 1906.07,
+    "evidence": [
+      {
+        "claim": "Alert triggered by customer_report: Customer C07297 message: 'I never made this $482.12 purchase. Please check my card.' Refers to 3476682.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3476682",
+          "C07297-K1"
+        ]
+      },
+      {
+        "claim": "Transaction device is newly associated with this account (id_15=New)",
+        "source": "graph",
+        "ref": "identity.csv:id_15",
+        "entity_ids": [
+          "3476682"
+        ]
+      },
+      {
+        "claim": "Cardholder explicitly disputed this transaction",
+        "source": "customer",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3476682",
+          "C07297-K1"
+        ]
+      },
+      {
+        "claim": "Transaction 3476682: $482.12 via online channel, product C, risk_score=0.25",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3476682"
+        ]
+      },
+      {
+        "claim": "Card 13729: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "13729"
+        ]
+      },
+      {
+        "claim": "Transaction 3476682: $482.12 via online at 2016-11-21 20:30:00, risk_score=0.25, card_network=mastercard (debit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3476682"
+        ]
+      },
+      {
+        "claim": "Customer C07297 explicitly disputed transaction 3476682",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "C07297",
+          "3476682"
+        ]
+      },
+      {
+        "claim": "Alert: Customer C07297 message: 'I never made this $482.12 purchase. Please check my card.' Refers to 3476682.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3476682",
+          "C07297-K1"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C07297",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C07297"
+        ]
+      },
+      {
+        "claim": "Customer C07297 has 50 transaction(s) in graph: avg $90.23, max $369.92, channels=['in_person'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C07297"
+        ]
+      },
+      {
+        "claim": "Identity record for 3476682: device=Trident/7.0, OS=Windows 7, browser=ie 11.0 for desktop, device_status=New [FLAGS: NEW DEVICE (id_15=New)]",
+        "source": "document",
+        "ref": "identity.csv",
+        "entity_ids": [
+          "3476682"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C07297-K1 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C07297-K1"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-2038",
+      "CC-0451",
+      "CC-4750",
+      "CC-2061",
+      "CC-2567"
+    ],
+    "summary": "Case HHG-006: customer report on card C07297-K1 (customer C07297), $482.12 online transaction. Pattern assessed as card not present new device (p=0.95), verdict: fraud. Estimated exposure: $1906.07. 5 prior confirmed fraud case(s) on this customer. Evidence: 12 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-006"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      },
+      {
+        "action": "FILE_REPORT",
+        "route": "L2",
+        "reason": "Denial + exposure $1906.07 > $1000 or shared device/cards. R2."
+      }
+    ],
+    "final": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      },
+      {
+        "action": "FILE_REPORT",
+        "route": "L2",
+        "reason": "Denial + exposure $1906.07 > $1000 or shared device/cards. R2."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": true,
+    "reason": "FILE_REPORT required: exposure $1906.07 > $1,000; customer denial of transaction.",
+    "narrative": "SUSPICIOUS ACTIVITY REPORT — HHG-006\n\nWHO: Customer C07297, card C07297-K1 (mastercard  debit). Alert triggered by: customer report.\n\nWHAT: 4 transaction(s) totaling $1906.07 USD assessed as card not present new device with fraud probability 0.95. Flagged transaction 3476682 of $482.12 USD via online. Customer C07297 has 5 prior confirmed fraud case(s) on record (e.g., CC-2038).\n\nWHEN: Activity between 2016-11-21 and 2016-11-21.\n\nWHERE: Transaction billed in region 264, country code 87. Channel: online. The transaction originated from device 'Trident/7.0' running Windows 7 via ie 11.0 for desktop, device status: New.\n\nHOW: Card not present new device — Online card-not-present transactions from a device newly associated with this account, potentially via proxy, inconsistent with normal behavior.\n\nWHY SUSPICIOUS: Alert triggered by customer_report: Customer C07297 message: 'I never made this $482.12 purchase. Please check my card.' Refers to 3476682.; Transaction device is newly associated with this account (id_15=New); Cardholder explicitly disputed this transaction; Transaction 3476682: $482.12 via online channel, product C, risk_score=0.25; Card 13729: network=? type=?. Fraud probability assessed at 95% based on 12 evidence item(s) from transaction graph, identity data, and closed case history. Policy rules applied: R1, R2, R2 (exposure > $1,000).",
+    "subjects": [
+      "C07297",
+      "C07297-K1"
+    ],
+    "total_amount_usd": 1906.07,
+    "activity_dates": [
+      "2016-11-21",
+      "2016-11-21"
+    ]
+  },
+  "stop_reason": "Fraud probability 0.95 >= 0.85 with 12 independent evidence pieces (Policy section 6).",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 2.82
+}

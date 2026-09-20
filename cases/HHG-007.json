@@ -1,0 +1,204 @@
+{
+  "case_id": "HHG-007",
+  "case": {
+    "status": "open",
+    "verdict": "uncertain",
+    "fraud_probability": 0.55,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3514948"
+    ],
+    "first_suspicious_txn_id": "3514948",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 111.92,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3514948 ($111.92, in billing region 264.0) at 0.87. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3514948",
+          "C09933-K2"
+        ]
+      },
+      {
+        "claim": "18 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-0104",
+          "CC-0765",
+          "CC-1228"
+        ]
+      },
+      {
+        "claim": "Transaction 3514948: $111.92 via in_person channel, product W, risk_score=0.87",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3514948"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4277 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4277",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-5521 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-5521",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2565 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2565",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1524 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1524",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-0104 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-0104",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3136 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3136",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2834 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2834",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-0657 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-0657",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1228 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1228",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3821 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3821",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4597 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4597",
+          "C09933"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4787 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4787",
+          "C09933"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-0104",
+      "CC-0657",
+      "CC-0765",
+      "CC-1228",
+      "CC-1524"
+    ],
+    "summary": "Case HHG-007: risk score on card C09933-K2 (customer C09933), $111.92 in_person transaction. Pattern assessed as none (p=0.55), verdict: uncertain. Estimated exposure: $111.92. 18 prior confirmed fraud case(s) on this customer. Evidence: 17 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-007"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 2.34
+}

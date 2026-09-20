@@ -1,0 +1,169 @@
+{
+  "case_id": "HHG-012",
+  "case": {
+    "status": "open",
+    "verdict": "uncertain",
+    "fraud_probability": 0.55,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3553342"
+    ],
+    "first_suspicious_txn_id": "3553342",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 30.91,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3553342 ($30.91, in billing region 494.0) at 0.55. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3553342",
+          "C05876-K2"
+        ]
+      },
+      {
+        "claim": "1 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2370"
+        ]
+      },
+      {
+        "claim": "Transaction 3553342: $30.91 via in_person channel, product W, risk_score=0.55",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3553342"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2370 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2370",
+          "C05876"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-0003 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-0003",
+          "C05876"
+        ]
+      },
+      {
+        "claim": "Card 12947: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "12947"
+        ]
+      },
+      {
+        "claim": "Transaction 3553342: $30.91 via in_person at 2016-12-18 04:00:31, risk_score=0.55, card_network=visa (debit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3553342"
+        ]
+      },
+      {
+        "claim": "Alert: Real-time model scored transaction 3553342 ($30.91, in billing region 494.0) at 0.55. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3553342",
+          "C05876-K2"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C05876",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C05876"
+        ]
+      },
+      {
+        "claim": "Customer C05876 has 1 prior confirmed fraud case(s): ['CC-2370']",
+        "source": "document",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2370"
+        ]
+      },
+      {
+        "claim": "Customer C05876 has 50 transaction(s) in graph: avg $51.15, max $332.91, channels=['in_person'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C05876"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C05876-K2 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C05876-K2"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-0003",
+      "CC-2370",
+      "CC-0910",
+      "CC-2077",
+      "CC-0408"
+    ],
+    "summary": "Case HHG-012: risk score on card C05876-K2 (customer C05876), $30.91 in_person transaction. Pattern assessed as none (p=0.55), verdict: uncertain. Estimated exposure: $30.91. 1 prior confirmed fraud case(s) on this customer. Evidence: 12 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-012"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 2.23
+}

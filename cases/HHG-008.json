@@ -1,0 +1,218 @@
+{
+  "case_id": "HHG-008",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.95,
+    "pattern": "card_not_present_fraud",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3558054",
+      "3553223",
+      "3553269",
+      "3553275",
+      "3553281",
+      "3554288",
+      "3554589",
+      "3554683",
+      "3555638",
+      "3555768",
+      "3556719",
+      "3557118",
+      "3557979",
+      "3557987",
+      "3558907"
+    ],
+    "first_suspicious_txn_id": "3553223",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 607.39,
+    "evidence": [
+      {
+        "claim": "Alert triggered by customer_report: Customer C13171 message: 'I never made this $55.68 purchase. Please check my card.' Refers to 3558054.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3558054",
+          "C13171-K2"
+        ]
+      },
+      {
+        "claim": "18 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-0056",
+          "CC-0467",
+          "CC-0772"
+        ]
+      },
+      {
+        "claim": "Cardholder explicitly disputed this transaction",
+        "source": "customer",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3558054",
+          "C13171-K2"
+        ]
+      },
+      {
+        "claim": "Transaction 3558054: $55.68 via online channel, product C, risk_score=0.38",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3558054"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1715 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1715",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4485 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4485",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4163 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4163",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2244 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2244",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1925 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1925",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4819 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4819",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3422 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3422",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2716 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2716",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2059 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2059",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-0467 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-0467",
+          "C13171"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2454 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2454",
+          "C13171"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-0056",
+      "CC-0467",
+      "CC-0772",
+      "CC-1293",
+      "CC-1715"
+    ],
+    "summary": "Case HHG-008: customer report on card C13171-K2 (customer C13171), $55.68 online transaction. Pattern assessed as card not present fraud (p=0.95), verdict: fraud. Estimated exposure: $607.39. 18 prior confirmed fraud case(s) on this customer. Evidence: 18 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-008"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      }
+    ],
+    "final": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Fraud probability 0.95 >= 0.85 with 18 independent evidence pieces (Policy section 6).",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 6.66
+}

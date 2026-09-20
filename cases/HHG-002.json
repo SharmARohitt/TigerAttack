@@ -1,0 +1,166 @@
+{
+  "case_id": "HHG-002",
+  "case": {
+    "status": "open",
+    "verdict": "uncertain",
+    "fraud_probability": 0.55,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3478782"
+    ],
+    "first_suspicious_txn_id": "3478782",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 292.36,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3478782 ($292.36, online) at 0.79. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3478782",
+          "C11891-K1"
+        ]
+      },
+      {
+        "claim": "1 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-4160"
+        ]
+      },
+      {
+        "claim": "Transaction 3478782: $292.36 via online channel, product C, risk_score=0.79",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3478782"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4160 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4160",
+          "C11891"
+        ]
+      },
+      {
+        "claim": "Card 18586: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "18586"
+        ]
+      },
+      {
+        "claim": "Transaction 3478782: $292.36 via online at 2016-11-22 17:27:07, risk_score=0.79, card_network=mastercard (credit), billing_country=",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3478782"
+        ]
+      },
+      {
+        "claim": "Alert: Real-time model scored transaction 3478782 ($292.36, online) at 0.79. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3478782",
+          "C11891-K1"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C11891",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C11891"
+        ]
+      },
+      {
+        "claim": "Customer C11891 has 1 prior confirmed fraud case(s): ['CC-4160']",
+        "source": "document",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-4160"
+        ]
+      },
+      {
+        "claim": "Customer C11891 has 44 transaction(s) in graph: avg $47.46, max $292.36, channels=['online'], regions=['60']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C11891"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C11891-K1 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C11891-K1"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-4160",
+      "CC-0393",
+      "CC-4292",
+      "CC-5484",
+      "CC-0628"
+    ],
+    "summary": "Case HHG-002: risk score on card C11891-K1 (customer C11891), $292.36 online transaction. Pattern assessed as none (p=0.55), verdict: uncertain. Estimated exposure: $292.36. 3 prior confirmed fraud case(s) on this customer. Evidence: 11 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-002"
+  },
+  "evidence_requests": [
+    {
+      "type": "analyst_info",
+      "asked_after_step": 0,
+      "assumed_response": "Analyst review: No additional internal information found. Evidence remains as gathered. (simulated: no new signals)"
+    }
+  ],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 15,
+  "tokens": 0,
+  "latency_s": 2.24
+}

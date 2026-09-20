@@ -1,0 +1,199 @@
+{
+  "case_id": "HHG-019",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.95,
+    "pattern": "account_takeover",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3503878"
+    ],
+    "first_suspicious_txn_id": "3503878",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 99.92,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3503878 ($99.92, online) at 0.90. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3503878",
+          "C07987-K2"
+        ]
+      },
+      {
+        "claim": "3 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2011",
+          "CC-2860",
+          "CC-5026"
+        ]
+      },
+      {
+        "claim": "Transaction device is newly associated with this account (id_15=New)",
+        "source": "graph",
+        "ref": "identity.csv:id_15",
+        "entity_ids": [
+          "3503878"
+        ]
+      },
+      {
+        "claim": "Transaction 3503878: $99.92 via online channel, product R, risk_score=0.9",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3503878"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2860 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2860",
+          "C07987"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2011 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2011",
+          "C07987"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2087 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2087",
+          "C07987"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-5026 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-5026",
+          "C07987"
+        ]
+      },
+      {
+        "claim": "Card 11539: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "11539"
+        ]
+      },
+      {
+        "claim": "Transaction 3503878: $99.92 via online at 2016-12-01 17:28:53, risk_score=0.90, card_network=visa (credit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3503878"
+        ]
+      },
+      {
+        "claim": "Alert: Real-time model scored transaction 3503878 ($99.92, online) at 0.90. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3503878",
+          "C07987-K2"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C07987",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C07987"
+        ]
+      },
+      {
+        "claim": "Customer C07987 has 3 prior confirmed fraud case(s): ['CC-2011', 'CC-2860', 'CC-5026']",
+        "source": "document",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2011",
+          "CC-2860",
+          "CC-5026"
+        ]
+      },
+      {
+        "claim": "Customer C07987 has 50 transaction(s) in graph: avg $297.08, max $1586.94, channels=['in_person', 'online'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C07987"
+        ]
+      },
+      {
+        "claim": "Identity record for 3503878: device=Windows, OS=other, browser=chrome 61.0, device_status=New [FLAGS: NEW DEVICE (id_15=New)]",
+        "source": "document",
+        "ref": "identity.csv",
+        "entity_ids": [
+          "3503878"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-2011",
+      "CC-2087",
+      "CC-2860",
+      "CC-5026",
+      "CC-0783"
+    ],
+    "summary": "Case HHG-019: risk score on card C07987-K2 (customer C07987), $99.92 online transaction. Pattern assessed as account takeover (p=0.95), verdict: fraud. Estimated exposure: $99.92. 4 prior confirmed fraud case(s) on this customer. Evidence: 16 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-019"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "High fraud probability 0.95."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Confirmed fraud p=0.95. Block card."
+      }
+    ],
+    "final": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "High fraud probability 0.95."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Confirmed fraud p=0.95. Block card."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Fraud probability 0.95 >= 0.85 with 16 independent evidence pieces (Policy section 6).",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 2.02
+}

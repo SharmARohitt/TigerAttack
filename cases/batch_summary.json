@@ -1,0 +1,229 @@
+{
+  "total": 20,
+  "completed": 20,
+  "failed": 0,
+  "results": {
+    "HHG-001": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 77.07,
+      "sar_filed": false,
+      "latency_s": 4.44,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-002": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 292.36,
+      "sar_filed": false,
+      "latency_s": 2.26,
+      "tool_calls": 15,
+      "tokens": 0
+    },
+    "HHG-003": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.8,
+      "pattern": "none",
+      "exposure_usd": 49.0,
+      "sar_filed": false,
+      "latency_s": 5.31,
+      "tool_calls": 15,
+      "tokens": 0
+    },
+    "HHG-004": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.95,
+      "pattern": "card_not_present_new_device",
+      "exposure_usd": 221.19,
+      "sar_filed": false,
+      "latency_s": 2.56,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-005": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 100.07,
+      "sar_filed": false,
+      "latency_s": 2.21,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-006": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.95,
+      "pattern": "card_not_present_new_device",
+      "exposure_usd": 1906.07,
+      "sar_filed": true,
+      "latency_s": 2.84,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-007": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 111.92,
+      "sar_filed": false,
+      "latency_s": 2.38,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-008": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.95,
+      "pattern": "card_not_present_fraud",
+      "exposure_usd": 607.39,
+      "sar_filed": false,
+      "latency_s": 6.67,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-009": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.95,
+      "pattern": "card_not_present_fraud",
+      "exposure_usd": 30.02,
+      "sar_filed": false,
+      "latency_s": 5.24,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-010": {
+      "status": "escalated",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 1000.03,
+      "sar_filed": false,
+      "latency_s": 2.4,
+      "tool_calls": 15,
+      "tokens": 0
+    },
+    "HHG-011": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.95,
+      "pattern": "card_not_present_new_device",
+      "exposure_usd": 2674.98,
+      "sar_filed": true,
+      "latency_s": 3.26,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-012": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 30.91,
+      "sar_filed": false,
+      "latency_s": 2.28,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-013": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 35.66,
+      "sar_filed": false,
+      "latency_s": 2.65,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-014": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.3,
+      "pattern": "none",
+      "exposure_usd": 74.96,
+      "sar_filed": false,
+      "latency_s": 2.07,
+      "tool_calls": 15,
+      "tokens": 0
+    },
+    "HHG-015": {
+      "status": "escalated",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 599.94,
+      "sar_filed": false,
+      "latency_s": 20.93,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-016": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.95,
+      "pattern": "card_not_present_fraud",
+      "exposure_usd": 59.67,
+      "sar_filed": false,
+      "latency_s": 2.49,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-017": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.8,
+      "pattern": "card_not_present_fraud",
+      "exposure_usd": 300.14,
+      "sar_filed": false,
+      "latency_s": 3.8,
+      "tool_calls": 15,
+      "tokens": 0
+    },
+    "HHG-018": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.8,
+      "pattern": "none",
+      "exposure_usd": 39.08,
+      "sar_filed": false,
+      "latency_s": 2.04,
+      "tool_calls": 15,
+      "tokens": 0
+    },
+    "HHG-019": {
+      "status": "closed_fraud",
+      "verdict": "fraud",
+      "fraud_probability": 0.95,
+      "pattern": "account_takeover",
+      "exposure_usd": 99.92,
+      "sar_filed": false,
+      "latency_s": 2.06,
+      "tool_calls": 14,
+      "tokens": 0
+    },
+    "HHG-020": {
+      "status": "open",
+      "verdict": "uncertain",
+      "fraud_probability": 0.55,
+      "pattern": "none",
+      "exposure_usd": 125.08,
+      "sar_filed": false,
+      "latency_s": 2.17,
+      "tool_calls": 14,
+      "tokens": 0
+    }
+  },
+  "started_at": "2026-09-20T11:13:33Z",
+  "finished_at": "2026-09-20T11:14:53Z"
+}

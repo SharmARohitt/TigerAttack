@@ -1,0 +1,198 @@
+{
+  "case_id": "HHG-005",
+  "case": {
+    "status": "open",
+    "verdict": "uncertain",
+    "fraud_probability": 0.55,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3523199"
+    ],
+    "first_suspicious_txn_id": "3523199",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 100.07,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3523199 ($100.07, online) at 0.54. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3523199",
+          "C02923-K1"
+        ]
+      },
+      {
+        "claim": "3 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2400",
+          "CC-2717",
+          "CC-2857"
+        ]
+      },
+      {
+        "claim": "Transaction device is newly associated with this account (id_15=New)",
+        "source": "graph",
+        "ref": "identity.csv:id_15",
+        "entity_ids": [
+          "3523199"
+        ]
+      },
+      {
+        "claim": "Transaction 3523199: $100.07 via online channel, product R, risk_score=0.54",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3523199"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2857 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2857",
+          "C02923"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2717 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2717",
+          "C02923"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2400 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2400",
+          "C02923"
+        ]
+      },
+      {
+        "claim": "Card 22606: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "22606"
+        ]
+      },
+      {
+        "claim": "Transaction 3523199: $100.07 via online at 2016-12-07 21:38:37, risk_score=0.54, card_network=visa (credit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3523199"
+        ]
+      },
+      {
+        "claim": "Alert: Real-time model scored transaction 3523199 ($100.07, online) at 0.54. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3523199",
+          "C02923-K1"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C02923",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C02923"
+        ]
+      },
+      {
+        "claim": "Customer C02923 has 3 prior confirmed fraud case(s): ['CC-2400', 'CC-2717', 'CC-2857']",
+        "source": "document",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2400",
+          "CC-2717",
+          "CC-2857"
+        ]
+      },
+      {
+        "claim": "Customer C02923 has 50 transaction(s) in graph: avg $128.17, max $270.06, channels=['in_person', 'online'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C02923"
+        ]
+      },
+      {
+        "claim": "Identity record for 3523199: device=iOS Device, OS=iOS 9.3.5, browser=mobile safari 9.0, device_status=New [FLAGS: NEW DEVICE (id_15=New)]",
+        "source": "document",
+        "ref": "identity.csv",
+        "entity_ids": [
+          "3523199"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C02923-K1 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C02923-K1"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-2400",
+      "CC-2717",
+      "CC-2857",
+      "CC-1389",
+      "CC-2384"
+    ],
+    "summary": "Case HHG-005: risk score on card C02923-K1 (customer C02923), $100.07 online transaction. Pattern assessed as none (p=0.55), verdict: uncertain. Estimated exposure: $100.07. 4 prior confirmed fraud case(s) on this customer. Evidence: 15 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-005"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 2.16
+}

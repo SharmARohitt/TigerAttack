@@ -1,0 +1,206 @@
+{
+  "case_id": "HHG-015",
+  "case": {
+    "status": "escalated",
+    "verdict": "uncertain",
+    "fraud_probability": 0.55,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3464869"
+    ],
+    "first_suspicious_txn_id": "3464869",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 599.94,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3464869 ($599.94, online) at 0.77. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3464869",
+          "C03042-K1"
+        ]
+      },
+      {
+        "claim": "2 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-0615",
+          "CC-3886"
+        ]
+      },
+      {
+        "claim": "Transaction device is newly associated with this account (id_15=New)",
+        "source": "graph",
+        "ref": "identity.csv:id_15",
+        "entity_ids": [
+          "3464869"
+        ]
+      },
+      {
+        "claim": "Transaction 3464869: $599.94 via online channel, product R, risk_score=0.77",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3464869"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1313 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1313",
+          "C03042"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-0615 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-0615",
+          "C03042"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3886 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3886",
+          "C03042"
+        ]
+      },
+      {
+        "claim": "Card 15158: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "15158"
+        ]
+      },
+      {
+        "claim": "Transaction 3464869: $599.94 via online at 2016-11-17 14:03:36, risk_score=0.77, card_network=mastercard (credit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3464869"
+        ]
+      },
+      {
+        "claim": "Alert: Real-time model scored transaction 3464869 ($599.94, online) at 0.77. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3464869",
+          "C03042-K1"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C03042",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C03042"
+        ]
+      },
+      {
+        "claim": "Customer C03042 has 2 prior confirmed fraud case(s): ['CC-0615', 'CC-3886']",
+        "source": "document",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-0615",
+          "CC-3886"
+        ]
+      },
+      {
+        "claim": "Customer C03042 has 50 transaction(s) in graph: avg $177.5, max $599.94, channels=['in_person', 'online'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C03042"
+        ]
+      },
+      {
+        "claim": "Identity record for 3464869: device=Trident/7.0, OS=Windows 8.1, browser=ie 11.0 for desktop, device_status=New [FLAGS: NEW DEVICE (id_15=New)]",
+        "source": "document",
+        "ref": "identity.csv",
+        "entity_ids": [
+          "3464869"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C03042-K1 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C03042-K1"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-0615",
+      "CC-1313",
+      "CC-3886",
+      "CC-0987",
+      "CC-2700"
+    ],
+    "summary": "Case HHG-015: risk score on card C03042-K1 (customer C03042), $599.94 online transaction. Pattern assessed as none (p=0.55), verdict: uncertain. Estimated exposure: $599.94. 3 prior confirmed fraud case(s) on this customer. Evidence: 15 item(s) gathered from graph and local data.",
+    "written_to_graph": false,
+    "graph_case_id": ""
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "ESCALATE_TO_ANALYST",
+        "route": "auto",
+        "reason": "Uncertain (p=0.55) + exposure $599.94 > $500. R8."
+      },
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "final": [
+      {
+        "action": "ESCALATE_TO_ANALYST",
+        "route": "auto",
+        "reason": "Uncertain (p=0.55) + exposure $599.94 > $500. R8."
+      },
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 20.92
+}

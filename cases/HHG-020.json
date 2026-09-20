@@ -1,0 +1,187 @@
+{
+  "case_id": "HHG-020",
+  "case": {
+    "status": "open",
+    "verdict": "uncertain",
+    "fraud_probability": 0.55,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3509359"
+    ],
+    "first_suspicious_txn_id": "3509359",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 125.08,
+    "evidence": [
+      {
+        "claim": "Alert triggered by risk_score: Real-time model scored transaction 3509359 ($125.08, online) at 0.52. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3509359",
+          "C12265-K2"
+        ]
+      },
+      {
+        "claim": "2 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2277",
+          "CC-2447"
+        ]
+      },
+      {
+        "claim": "Transaction device is newly associated with this account (id_15=New)",
+        "source": "graph",
+        "ref": "identity.csv:id_15",
+        "entity_ids": [
+          "3509359"
+        ]
+      },
+      {
+        "claim": "Transaction 3509359: $125.08 via online channel, product R, risk_score=0.52",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3509359"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2447 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2447",
+          "C12265"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2277 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2277",
+          "C12265"
+        ]
+      },
+      {
+        "claim": "Card 10010: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "10010"
+        ]
+      },
+      {
+        "claim": "Transaction 3509359: $125.08 via online at 2016-12-03 06:04:26, risk_score=0.52, card_network=visa (debit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3509359"
+        ]
+      },
+      {
+        "claim": "Alert: Real-time model scored transaction 3509359 ($125.08, online) at 0.52. Review and decide.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3509359",
+          "C12265-K2"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C12265",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C12265"
+        ]
+      },
+      {
+        "claim": "Customer C12265 has 2 prior confirmed fraud case(s): ['CC-2277', 'CC-2447']",
+        "source": "document",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-2277",
+          "CC-2447"
+        ]
+      },
+      {
+        "claim": "Customer C12265 has 50 transaction(s) in graph: avg $111.42, max $702.77, channels=['in_person', 'online'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C12265"
+        ]
+      },
+      {
+        "claim": "Identity record for 3509359: device=Trident/7.0, OS=Windows 10, browser=ie 11.0 for desktop, device_status=New [FLAGS: NEW DEVICE (id_15=New)]",
+        "source": "document",
+        "ref": "identity.csv",
+        "entity_ids": [
+          "3509359"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C12265-K2 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C12265-K2"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-2277",
+      "CC-2447",
+      "CC-1447",
+      "CC-1183",
+      "CC-5537"
+    ],
+    "summary": "Case HHG-020: risk score on card C12265-K2 (customer C12265), $125.08 online transaction. Pattern assessed as none (p=0.55), verdict: uncertain. Estimated exposure: $125.08. 2 prior confirmed fraud case(s) on this customer. Evidence: 14 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-020"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Medium risk p=0.55. Monitor card."
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "Medium risk — require step-up before further transactions."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 2.15
+}

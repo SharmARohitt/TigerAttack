@@ -1,0 +1,147 @@
+{
+  "case_id": "HHG-014",
+  "case": {
+    "status": "open",
+    "verdict": "uncertain",
+    "fraud_probability": 0.3,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3478561"
+    ],
+    "first_suspicious_txn_id": "3478561",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 74.96,
+    "evidence": [
+      {
+        "claim": "Alert triggered by analyst_request: Analyst request: several cards this month show purchases from the same unusual device profile. Review transaction 347856",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3478561",
+          "C13487-K1"
+        ]
+      },
+      {
+        "claim": "Transaction device is newly associated with this account (id_15=New)",
+        "source": "graph",
+        "ref": "identity.csv:id_15",
+        "entity_ids": [
+          "3478561"
+        ]
+      },
+      {
+        "claim": "Transaction 3478561: $74.96 via online channel, product C, risk_score=0.05",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3478561"
+        ]
+      },
+      {
+        "claim": "Card 13250: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "13250"
+        ]
+      },
+      {
+        "claim": "Transaction 3478561: $74.96 via online at 2016-11-22 16:11:00, risk_score=0.05, card_network=mastercard (debit), billing_country=87",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3478561"
+        ]
+      },
+      {
+        "claim": "Alert: Analyst request: several cards this month show purchases from the same unusual device profile. Review transaction 3478561 on card C13487-K1 and look for related activity.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3478561",
+          "C13487-K1"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C13487",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C13487"
+        ]
+      },
+      {
+        "claim": "Customer C13487 has 50 transaction(s) in graph: avg $55.83, max $252.28, channels=['in_person', 'online'], regions=['87']",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C13487"
+        ]
+      },
+      {
+        "claim": "Identity record for 3478561: device=SM-G935F Build/NRD90M, OS=Android 7.0, browser=chrome 62.0 for android, device_status=New [FLAGS: NEW DEVICE (id_15=New)]",
+        "source": "document",
+        "ref": "identity.csv",
+        "entity_ids": [
+          "3478561"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C13487-K1 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C13487-K1"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-2985",
+      "CC-3035",
+      "CC-2649",
+      "CC-2971",
+      "CC-0034"
+    ],
+    "summary": "Case HHG-014: analyst request on card C13487-K1 (customer C13487), $74.96 online transaction. Pattern assessed as none (p=0.30), verdict: uncertain. Estimated exposure: $74.96. 4 prior confirmed fraud case(s) on this customer. Evidence: 10 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-014"
+  },
+  "evidence_requests": [
+    {
+      "type": "step_up_auth",
+      "asked_after_step": 0,
+      "assumed_response": "Step-up authentication passed. (simulated: fp=0.45 — assumed pass reduces fraud suspicion)"
+    }
+  ],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "VERIFY_WITH_CUSTOMER",
+        "route": "auto",
+        "reason": "p=0.45 < 0.70 with 1 signal. Policy R1."
+      }
+    ],
+    "final": [
+      {
+        "action": "ALLOW_TRANSACTION",
+        "route": "auto",
+        "reason": "Low fraud probability p=0.30 < 0.40. Allow."
+      }
+    ],
+    "what_changed": "Added ALLOW_TRANSACTION Removed VERIFY_WITH_CUSTOMER after evidence response: 'passed'."
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Investigation completed — all applicable policy rules evaluated.",
+  "tool_calls": 15,
+  "tokens": 0,
+  "latency_s": 2.04
+}

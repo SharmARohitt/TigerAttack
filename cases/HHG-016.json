@@ -1,0 +1,169 @@
+{
+  "case_id": "HHG-016",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.95,
+    "pattern": "card_not_present_fraud",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3534820"
+    ],
+    "first_suspicious_txn_id": "3534820",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 59.67,
+    "evidence": [
+      {
+        "claim": "Alert triggered by customer_report: Customer C09988 message: 'I never made this $59.67 purchase. Please check my card.' Refers to 3534820.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3534820",
+          "C09988-K1"
+        ]
+      },
+      {
+        "claim": "Transaction device is newly associated with this account (id_15=New)",
+        "source": "graph",
+        "ref": "identity.csv:id_15",
+        "entity_ids": [
+          "3534820"
+        ]
+      },
+      {
+        "claim": "Cardholder explicitly disputed this transaction",
+        "source": "customer",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3534820",
+          "C09988-K1"
+        ]
+      },
+      {
+        "claim": "Transaction 3534820: $59.67 via online channel, product C, risk_score=0.37",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3534820"
+        ]
+      },
+      {
+        "claim": "Card 11242: network=? type=?",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "11242"
+        ]
+      },
+      {
+        "claim": "Transaction 3534820: $59.67 via online at 2016-12-11 22:39:08, risk_score=0.37, card_network=visa (debit), billing_country=",
+        "source": "document",
+        "ref": "transactions_clean.csv",
+        "entity_ids": [
+          "3534820"
+        ]
+      },
+      {
+        "claim": "Customer C09988 explicitly disputed transaction 3534820",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "C09988",
+          "3534820"
+        ]
+      },
+      {
+        "claim": "Alert: Customer C09988 message: 'I never made this $59.67 purchase. Please check my card.' Refers to 3534820.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3534820",
+          "C09988-K1"
+        ]
+      },
+      {
+        "claim": "Transaction belongs to customer C09988",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "C09988"
+        ]
+      },
+      {
+        "claim": "Customer C09988 has 50 transaction(s) in graph: avg $36.7, max $134.97, channels=['online'], regions=[]",
+        "source": "graph",
+        "ref": "get_customer_history",
+        "entity_ids": [
+          "C09988"
+        ]
+      },
+      {
+        "claim": "Identity record for 3534820: device=Windows, OS=?, browser=edge 16.0, device_status=New [FLAGS: NEW DEVICE (id_15=New)]",
+        "source": "document",
+        "ref": "identity.csv",
+        "entity_ids": [
+          "3534820"
+        ]
+      },
+      {
+        "claim": "No other cards connected to C09988-K1 in graph",
+        "source": "graph",
+        "ref": "find_connected_cards",
+        "entity_ids": [
+          "C09988-K1"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-3106",
+      "CC-2909",
+      "CC-3697",
+      "CC-4020",
+      "CC-1853"
+    ],
+    "summary": "Case HHG-016: customer report on card C09988-K1 (customer C09988), $59.67 online transaction. Pattern assessed as card not present fraud (p=0.95), verdict: fraud. Estimated exposure: $59.67. 4 prior confirmed fraud case(s) on this customer. Evidence: 12 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-016"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      }
+    ],
+    "final": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Fraud probability 0.95 >= 0.85 with 12 independent evidence pieces (Policy section 6).",
+  "tool_calls": 14,
+  "tokens": 0,
+  "latency_s": 2.48
+}

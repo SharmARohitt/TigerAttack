@@ -1,0 +1,210 @@
+{
+  "case_id": "HHG-018",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.8,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3491361"
+    ],
+    "first_suspicious_txn_id": "3491361",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 39.08,
+    "evidence": [
+      {
+        "claim": "Alert triggered by customer_report: Customer C02354 message: 'I never made this $39.08 purchase. Please check my card.' Refers to 3491361.",
+        "source": "document",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3491361",
+          "C02354-K2"
+        ]
+      },
+      {
+        "claim": "19 prior confirmed fraud case(s) on this customer/card",
+        "source": "graph",
+        "ref": "closed_cases_history.csv",
+        "entity_ids": [
+          "CC-0255",
+          "CC-0454",
+          "CC-0631"
+        ]
+      },
+      {
+        "claim": "Cardholder explicitly disputed this transaction",
+        "source": "customer",
+        "ref": "case_pack.csv",
+        "entity_ids": [
+          "3491361",
+          "C02354-K2"
+        ]
+      },
+      {
+        "claim": "Transaction 3491361: $39.08 via in_person channel, product W, risk_score=0.48",
+        "source": "graph",
+        "ref": "Transaction_Fraud",
+        "entity_ids": [
+          "3491361"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3634 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3634",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4436 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4436",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-0631 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-0631",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-2051 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-2051",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3537 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3537",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-5441 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-5441",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4721 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4721",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3899 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3899",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-3085 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-3085",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-4942 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-4942",
+          "C02354"
+        ]
+      },
+      {
+        "claim": "Prior fraud case CC-1450 found in graph: outcome=, pattern=, exposure=$0",
+        "source": "graph",
+        "ref": "find_prior_fraud_cases",
+        "entity_ids": [
+          "CC-1450",
+          "C02354"
+        ]
+      }
+    ],
+    "similar_prior_cases": [
+      "CC-0255",
+      "CC-0405",
+      "CC-0454",
+      "CC-0631",
+      "CC-1450"
+    ],
+    "summary": "Case HHG-018: customer report on card C02354-K2 (customer C02354), $39.08 in_person transaction. Pattern assessed as none (p=0.80), verdict: fraud. Estimated exposure: $39.08. 19 prior confirmed fraud case(s) on this customer. Evidence: 18 item(s) gathered from graph and local data.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-018"
+  },
+  "evidence_requests": [
+    {
+      "type": "customer_validation",
+      "asked_after_step": 0,
+      "assumed_response": "Customer reconfirmed dispute: 'I did not make this transaction. Please block my card.' (simulated: customer report trigger implies denial)"
+    }
+  ],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      }
+    ],
+    "final": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "Customer dispute. Policy R2."
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "Customer denied transaction. Policy R2."
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No FILE_REPORT action in final recommendations — SAR not required.",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Customer response 'denied' settled the question.",
+  "tool_calls": 15,
+  "tokens": 0,
+  "latency_s": 2.02
+}

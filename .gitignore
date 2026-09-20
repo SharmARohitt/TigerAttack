@@ -1,0 +1,35 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Local runtime and generated data
+*.db
+*.sqlite
+*.sqlite3
+*.pkl
+*.log
+
+# Large local datasets; keep the small case pack and documentation
+Datasets/*.csv
+!Datasets/case_pack.csv
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
