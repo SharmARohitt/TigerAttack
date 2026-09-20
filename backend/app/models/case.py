@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -168,7 +168,7 @@ class InvestigationState(BaseModel):
     step: int = 0
     tool_calls: int = 0
     tokens: int = 0
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     flagged_txn: Optional[dict[str, Any]] = None
     customer_history: list[dict[str, Any]] = Field(default_factory=list)

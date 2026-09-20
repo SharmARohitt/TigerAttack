@@ -13,9 +13,10 @@ fraud/, policy/, and graphrag/ modules.
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, AsyncGenerator
 
 from ..config import get_settings
@@ -48,6 +49,47 @@ from ..tigergraph.mcp_client import get_mcp_investigation_client
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def validate_grounded_llm_output(
+    context: dict[str, Any], output: dict[str, Any]
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Accept only LLM evidence whose entity IDs occur in the supplied pack."""
+    allowed_ids: set[str] = set()
+    for item in context.get("graph_evidence", []) + context.get("mcp_evidence", []):
+        allowed_ids.update(str(v) for v in item.get("entity_ids", []) if v)
+    trigger = context.get("trigger", {})
+    allowed_ids.update(str(trigger[key]) for key in ("txn_id", "card_id", "customer_id") if trigger.get(key))
+    allowed_ids.update(
+        str(item.get("case_id")) for item in context.get("historical_cases", [])
+        if item.get("case_id")
+    )
+    allowed_ids.update(
+        str(item.get("rule_id")) for item in context.get("policy_evidence", [])
+        if item.get("rule_id")
+    )
+
+    accepted: list[dict[str, Any]] = []
+    fabricated_entities = 0
+    unsupported_claims = 0
+    for item in output.get("evidence", [])[:5]:
+        if not isinstance(item, dict):
+            unsupported_claims += 1
+            continue
+        entity_ids = [str(v) for v in item.get("entity_ids", []) if v]
+        unknown_ids = [value for value in entity_ids if value not in allowed_ids]
+        if unknown_ids:
+            fabricated_entities += len(unknown_ids)
+            unsupported_claims += 1
+            continue
+        accepted.append({
+            "claim": str(item.get("claim", ""))[:500],
+            "entity_ids": entity_ids,
+        })
+    return accepted, {
+        "fabricated_entities": fabricated_entities,
+        "unsupported_claims": unsupported_claims,
+    }
 
 
 class FraudAgent:
@@ -591,6 +633,16 @@ class FraudAgent:
             state.uncertainty_flags.extend(pack.uncertainties[:3])
 
             llm_ctx = pack.to_llm_context()
+            serialized_context = json.dumps(llm_ctx, sort_keys=True, default=str)
+            state.validation.update({
+                "llm_context_source": "EvidencePack.to_llm_context",
+                "llm_context_sha256": hashlib.sha256(
+                    serialized_context.encode("utf-8")
+                ).hexdigest(),
+                "llm_context_keys": sorted(llm_ctx.keys()),
+                "llm_context_chars": len(serialized_context),
+                "llm_raw_dataset_in_context": False,
+            })
 
         except Exception as exc:  # noqa: BLE001
             logger.warning("RAG build failed, falling back to legacy context: %s", exc)
@@ -652,7 +704,10 @@ class FraudAgent:
     ) -> dict[str, Any]:
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=settings.llm_api_key)
+            client = openai.AsyncOpenAI(
+                api_key=settings.llm_api_key,
+                timeout=settings.llm_timeout_s,
+            )
             system_prompt = self._build_system_prompt()
             user_prompt = self._build_user_prompt(state, ctx)
             resp = await client.chat.completions.create(
@@ -669,6 +724,8 @@ class FraudAgent:
             data = json.loads(content)
             tokens = resp.usage.total_tokens if resp.usage else 0
             fp = float(data.get("fraud_probability", risk.risk_score))
+            accepted, grounding = validate_grounded_llm_output(ctx, data)
+            state.validation.update(grounding)
             state.graph_evidence.extend([
                 EvidenceItem(
                     claim=e.get("claim", ""),
@@ -676,9 +733,13 @@ class FraudAgent:
                     ref="llm_reasoning",
                     entity_ids=e.get("entity_ids", []),
                 )
-                for e in data.get("evidence", [])[:5]
+                for e in accepted
             ])
-            return {"fraud_probability": round(fp, 3), "tokens": tokens}
+            return {
+                "fraud_probability": round(fp, 3),
+                "tokens": tokens,
+                "grounding": grounding,
+            }
         except Exception as exc:  # noqa: BLE001
             logger.warning("OpenAI call failed: %s", exc)
             return self._deterministic_probability(state, pattern_result, risk)
@@ -688,7 +749,10 @@ class FraudAgent:
     ) -> dict[str, Any]:
         try:
             import anthropic
-            client = anthropic.AsyncAnthropic(api_key=settings.llm_api_key)
+            client = anthropic.AsyncAnthropic(
+                api_key=settings.llm_api_key,
+                timeout=settings.llm_timeout_s,
+            )
             user_prompt = self._build_user_prompt(state, ctx)
             resp = await client.messages.create(
                 model=settings.llm_model,
@@ -703,8 +767,14 @@ class FraudAgent:
             if match:
                 data = json.loads(match.group())
                 fp = float(data.get("fraud_probability", risk.risk_score))
+                _, grounding = validate_grounded_llm_output(ctx, data)
+                state.validation.update(grounding)
                 tokens = (resp.usage.input_tokens + resp.usage.output_tokens) if resp.usage else 0
-                return {"fraud_probability": round(fp, 3), "tokens": tokens}
+                return {
+                    "fraud_probability": round(fp, 3),
+                    "tokens": tokens,
+                    "grounding": grounding,
+                }
         except Exception as exc:  # noqa: BLE001
             logger.warning("Anthropic call failed: %s", exc)
         return self._deterministic_probability(state, pattern_result, risk)
@@ -910,7 +980,7 @@ class FraudAgent:
             "exposure_usd":     state.exposure_usd,
             "summary":          self._generate_summary(state, exposure_obj),
             "opened_at":        state.started_at.isoformat(),
-            "closed_at":        datetime.utcnow().isoformat(),
+            "closed_at":        datetime.now(timezone.utc).isoformat(),
             "affected_txn_ids": [t.get("TransactionID", "") for t in state.affected_txns],
             "connected_card_ids": exposure_obj.connected_card_ids if exposure_obj else [],
             "actions_taken":    [a.action.value for a in state.final_actions],
@@ -986,7 +1056,7 @@ class FraudAgent:
             runtime={
                 "tigergraph": state.runtime.get("tigergraph", "DEGRADED"),
                 "mcp": state.runtime.get("mcp", "DEGRADED"),
-                "llm": "AVAILABLE" if self._llm_available else "DEGRADED",
+                "llm": "AVAILABLE" if self._llm_available else "NOT_AVAILABLE",
                 "graphrag": "AVAILABLE" if self._evidence_pack else "DEGRADED",
             },
             audit=state.audit_trail,
@@ -1046,6 +1116,6 @@ class FraudAgent:
             "step": step,
             "action": action,
             "status": status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             **(data or {}),
         })

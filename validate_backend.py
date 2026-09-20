@@ -19,10 +19,12 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.agents.fraud_agent import FraudAgent  # noqa: E402
+from app.agents.fraud_agent import FraudAgent, validate_grounded_llm_output  # noqa: E402
+from app.config import get_settings  # noqa: E402
 from app.data_layer import get_data_layer  # noqa: E402
 from app.tigergraph.mcp_client import get_mcp_investigation_client  # noqa: E402
 from app.tigergraph.queries import TGQueries  # noqa: E402
+from app.tigergraph.client import get_client  # noqa: E402
 
 
 def _status(ok: bool, attempted: bool = True) -> str:
@@ -118,7 +120,25 @@ async def _live_checks(rows: list[dict[str, Any]], progress_path: Path | None = 
     except Exception as exc:  # noqa: BLE001
         mcp_report = {"status": "FAILED", "error": str(exc)}
 
-    return {"cases": cases, "graph_algorithm": graph_algorithm, "mcp": mcp_report}
+    try:
+        installed = get_client().installed_queries()
+        direct_queries = [str(name).split("/")[-1] for name in installed]
+        gsql_report = {
+            "status": "PASS" if direct_queries else "DEGRADED",
+            "source": "pyTigerGraph.getInstalledQueries",
+            "query_count": len(direct_queries),
+            "queries": sorted(direct_queries),
+            "mcp_metadata_status": "DEGRADED" if len(mcp_report.get("installed_queries_discovered", [])) < len(direct_queries) else "PASS",
+        }
+    except Exception as exc:  # noqa: BLE001
+        gsql_report = {"status": "FAILED", "error": str(exc)}
+
+    return {
+        "cases": cases,
+        "graph_algorithm": graph_algorithm,
+        "mcp": mcp_report,
+        "gsql": gsql_report,
+    }
 
 
 def _security_check() -> dict[str, Any]:
@@ -144,6 +164,26 @@ def _tests_check() -> dict[str, Any]:
         "returncode": result.returncode,
         "duration_s": round(time.monotonic() - started, 3),
         "output_tail": (result.stdout + result.stderr)[-2000:],
+    }
+
+
+def _adversarial_grounding_check() -> dict[str, Any]:
+    """Verify an unsupported device ID is rejected without any live mutation."""
+    context = {
+        "trigger": {"txn_id": "3583227", "card_id": "C08106-K1", "customer_id": "C08106"},
+        "graph_evidence": [{"entity_ids": ["3583227", "C08106-K1", "C08106"]}],
+        "mcp_evidence": [],
+        "historical_cases": [],
+        "policy_evidence": [],
+    }
+    accepted, counters = validate_grounded_llm_output(
+        context,
+        {"evidence": [{"claim": "Unknown device", "entity_ids": ["DEVICE-NOT-IN-PACK"]}]},
+    )
+    return {
+        "status": "PASS" if not accepted and counters["fabricated_entities"] == 1 else "FAIL",
+        "accepted_items": len(accepted),
+        **counters,
     }
 
 
@@ -212,15 +252,19 @@ async def main() -> int:
         "tigergraph": "PASS" if any(c.get("runtime", {}).get("tigergraph") == "CONNECTED" for c in completed) else "DEGRADED",
         "mcp": live["mcp"].get("status", "DEGRADED"),
         "graphrag": "PASS" if completed else "FAILED",
-        "llm": "PASS" if any(c.get("runtime", {}).get("llm") == "AVAILABLE" for c in completed) else "DEGRADED",
+        "llm": "PASS" if any(c.get("runtime", {}).get("llm") == "AVAILABLE" for c in completed) else "NOT_AVAILABLE",
     }
+    llm_available = runtime["llm"] == "PASS"
+    llm_settings = get_settings()
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "classification": "LIVE_SYSTEM_AND_END_TO_END",
         "runtime": runtime,
         "components": {
             "TigerGraph": runtime["tigergraph"],
-            "GSQL": "DEGRADED" if not live["mcp"].get("installed_queries_discovered") else "PASS",
+            "GSQL enumeration": live["gsql"].get("status", "DEGRADED"),
+            "GSQL execution": "PASS" if any(c.get("runtime", {}).get("tigergraph") == "CONNECTED" for c in completed) else "DEGRADED",
+            "MCP query metadata": live["gsql"].get("mcp_metadata_status", "DEGRADED"),
             "Graph algorithms": live["graph_algorithm"]["status"],
             "MCP": runtime["mcp"],
             "Agent MCP path": "PASS" if mcp_successes else "DEGRADED",
@@ -233,6 +277,7 @@ async def main() -> int:
             "Graph write/readback": "PASS" if any(c.get("case_memory", {}).get("readback") for c in completed) else "DEGRADED",
             "Audit trail": "PASS" if all(c.get("audit_event_count", 0) > 0 for c in completed) else "DEGRADED",
             "Security": _security_check(),
+            "Grounding adversarial test": _adversarial_grounding_check(),
         },
         "aggregate": {
             "cases_total": len(rows),
@@ -248,13 +293,28 @@ async def main() -> int:
         },
         "graph_algorithm": live["graph_algorithm"],
         "mcp_discovery": live["mcp"],
+        "gsql": live["gsql"],
+        "llm": {
+            "provider": llm_settings.llm_provider,
+            "model": llm_settings.llm_model,
+            "runtime_availability": "PASS" if llm_available else "NOT_AVAILABLE",
+            "real_invocation": llm_available,
+            "fallback_used": not llm_available,
+            "evidencepack_only_context": all(
+                c.get("grounding", {}).get("llm_raw_dataset_in_context") is False
+                for c in completed
+            ),
+        },
+        "grounding_adversarial": _adversarial_grounding_check(),
         "cases": live["cases"],
     }
-    report["tests"] = _tests_check()
+    report["tests"] = _tests_check() if not args.skip_tests else {
+        "status": "NOT_RUN",
+        "reason": "--skip-tests was supplied",
+    }
     (output_dir / "backend_validation.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     (output_dir / "backend_validation.md").write_text(_markdown_report(report), encoding="utf-8")
     if not args.skip_tests:
-        report["tests"] = _tests_check()
         (output_dir / "backend_validation.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
         (output_dir / "backend_validation.md").write_text(_markdown_report(report), encoding="utf-8")
     print(json.dumps({"aggregate": report["aggregate"], "components": report["components"]}, indent=2, default=str))

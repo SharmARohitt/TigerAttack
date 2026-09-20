@@ -8,7 +8,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -86,8 +86,8 @@ class CaseManager:
                     answer.case.fraud_probability,
                     answer.case.pattern.value,
                     answer.case.exposure_usd,
-                    datetime.utcnow().isoformat(),
-                    datetime.utcnow().isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
                     answer.model_dump_json(),
                 ),
             )
@@ -121,7 +121,7 @@ class CaseManager:
                         e.get("step", 0),
                         e.get("action", ""),
                         e.get("status", ""),
-                        e.get("timestamp", datetime.utcnow().isoformat()),
+                        e.get("timestamp", datetime.now(timezone.utc).isoformat()),
                         json.dumps({k: v for k, v in e.items()
                                     if k not in ("step", "action", "status", "timestamp")}),
                     ),

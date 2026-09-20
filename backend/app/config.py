@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     llm_api_key: str = ""
     llm_model: str = "gpt-4o"
+    llm_timeout_s: float = 30.0
 
     # ── GraphRAG ──────────────────────────────────────────────────────────────
     graphrag_provider: str = "tigergraph"
