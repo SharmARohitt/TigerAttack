@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -63,6 +64,8 @@ def _case_metrics(answer: Any) -> dict[str, Any]:
         "audit_event_count": len(answer.audit),
         "stop_reason": answer.stop_reason,
         "grounding": answer.validation,
+        "llm_api_calls": answer.validation.get("llm_api_calls", 0),
+        "llm_backup_used": answer.validation.get("llm_backup_used", False),
     }
 
 
@@ -158,6 +161,7 @@ def _tests_check() -> dict[str, Any]:
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "backend/tests", "-q"],
         cwd=ROOT, capture_output=True, text=True,
+        env={**os.environ, "TIGERATTACK_DISABLE_LLM": "1"},
     )
     return {
         "status": "PASS" if result.returncode == 0 else "FAIL",
@@ -288,6 +292,8 @@ async def main() -> int:
             "cases_completed": len(completed),
             "mcp_calls": mcp_calls,
             "mcp_successful_calls": mcp_successes,
+            "llm_api_calls": sum(c.get("llm_api_calls", 0) for c in completed),
+            "llm_backup_uses": sum(bool(c.get("llm_backup_used")) for c in completed),
             "graph_evidence_items": sum(c.get("graph_evidence_count", 0) for c in completed),
             "historical_cases": sum(c.get("historical_cases", 0) for c in completed),
             "evidence_requests": sum(c.get("evidence_requests", 0) for c in completed),

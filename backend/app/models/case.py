@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +18,21 @@ class CaseStatus(str, Enum):
     closed_fraud = "closed_fraud"
     closed_legitimate = "closed_legitimate"
     escalated = "escalated"
+
+
+class LifecycleState(str, Enum):
+    new = "NEW"
+    investigating = "INVESTIGATING"
+    awaiting_external_evidence = "AWAITING_EXTERNAL_EVIDENCE"
+    reassessing = "REASSESSING"
+    ready_for_action = "READY_FOR_ACTION"
+    awaiting_approval = "AWAITING_APPROVAL"
+    action_executing = "ACTION_EXECUTING"
+    action_executed = "ACTION_EXECUTED"
+    action_failed = "ACTION_FAILED"
+    escalated = "ESCALATED"
+    closed = "CLOSED"
+    failed = "FAILED"
 
 
 class Verdict(str, Enum):
@@ -82,9 +98,16 @@ class EvidenceItem(BaseModel):
 
 
 class EvidenceRequest(BaseModel):
+    request_id: str = Field(default_factory=lambda: str(uuid4()))
     type: EvidenceRequestType
     asked_after_step: int
-    assumed_response: str
+    assumed_response: str = ""
+    status: str = "pending"
+    requested_from: str = "external_provider"
+    reason: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    received_at: Optional[datetime] = None
+    response: dict[str, Any] = Field(default_factory=dict)
 
 
 class ActionRecommendation(BaseModel):
@@ -133,12 +156,14 @@ class CaseAnswer(BaseModel):
     """The exact structure graded by the answer key."""
 
     case_id: str
+    trigger: dict[str, Any] = Field(default_factory=dict)
     case: CaseRecord = Field(default_factory=CaseRecord)
     evidence_requests: list[EvidenceRequest] = Field(default_factory=list)
     next_best_actions: NextBestActions = Field(default_factory=NextBestActions)
     sar: SAR = Field(default_factory=SAR)
     stop_reason: str = ""
     tool_calls: int = 0
+    llm_calls: int = 0
     tokens: int = 0
     latency_s: float = 0.0
     runtime: dict[str, str] = Field(default_factory=dict)
@@ -148,6 +173,10 @@ class CaseAnswer(BaseModel):
     action_decisions: dict[str, dict[str, Any]] = Field(default_factory=dict)
     policy_evidence: list[dict[str, Any]] = Field(default_factory=list)
     typology_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    lifecycle_state: LifecycleState = LifecycleState.investigating
+    initial_assessment: dict[str, Any] = Field(default_factory=dict)
+    reassessment_history: list[dict[str, Any]] = Field(default_factory=list)
+    explanation: dict[str, Any] = Field(default_factory=dict)
 
 
 # ── Internal investigation state (not in the answer file) ────────────────────
@@ -167,6 +196,7 @@ class InvestigationState(BaseModel):
     # Progressive fields
     step: int = 0
     tool_calls: int = 0
+    llm_calls: int = 0
     tokens: int = 0
     started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -210,3 +240,6 @@ class InvestigationState(BaseModel):
     mcp_evidence: list[dict[str, Any]] = Field(default_factory=list)
     policy_evidence: list[dict[str, Any]] = Field(default_factory=list)
     typology_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    lifecycle_state: LifecycleState = LifecycleState.investigating
+    initial_assessment: dict[str, Any] = Field(default_factory=dict)
+    reassessment_history: list[dict[str, Any]] = Field(default_factory=list)

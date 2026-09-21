@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import hashlib
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator
@@ -36,6 +37,7 @@ from ..models.case import (
     EvidenceSource,
     FraudPattern,
     InvestigationState,
+    LifecycleState,
     NextBestActions,
     SAR,
     Verdict,
@@ -46,6 +48,8 @@ from ..rag.evidence import EvidencePack, ProvenanceItem
 from ..reports.sar_generator import SARGenerator
 from ..tigergraph.queries import TGQueries
 from ..tigergraph.mcp_client import get_mcp_investigation_client
+from ..llm.factory import get_llm_provider
+from ..cases.state_machine import transition
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -110,9 +114,102 @@ class FraudAgent:
         self.graphrag = GraphRAGRetriever()          # kept for backward compat
         self.rag = InvestigationContextBuilder()     # new real GraphRAG layer
         self.sar_generator = SARGenerator()
-        self._llm_available = bool(settings.llm_api_key)
+        self._llm_available = bool(
+            settings.llm_api_key and os.getenv("TIGERATTACK_DISABLE_LLM", "0") != "1"
+        )
         self._evidence_pack: EvidencePack | None = None  # persisted per investigation
         self._mcp_client_factory = mcp_client_factory or get_mcp_investigation_client
+
+    def reassess_answer(
+        self, answer: CaseAnswer, request_id: str, response: dict[str, Any]
+    ) -> CaseAnswer:
+        """Resume a persisted case from an external evidence response."""
+        request = next(
+            (item for item in answer.evidence_requests if item.request_id == request_id),
+            None,
+        )
+        if request is None:
+            raise ValueError("Evidence request does not belong to this case")
+        if request.status == "fulfilled":
+            raise ValueError("Evidence request has already been fulfilled")
+
+        previous_probability = answer.case.fraud_probability
+        outcome = str(response.get("outcome", "")).lower()
+        delta = {
+            "denied": 0.25,
+            "failed": 0.15,
+            "confirmed": -0.30,
+            "passed": -0.15,
+        }.get(outcome, 0.0)
+        probability = max(0.0, min(1.0, round(previous_probability + delta, 3)))
+        request.status = "fulfilled"
+        request.response = response
+        request.received_at = datetime.now(timezone.utc)
+        request.assumed_response = str(response.get("detail", response.get("response", "")))
+
+        answer.case.evidence.append(EvidenceItem(
+            claim=f"External {request.type.value} response received: {request.assumed_response[:300]}",
+            source=EvidenceSource.external,
+            ref=f"evidence-request:{request_id}",
+            entity_ids=[answer.trigger.get("transaction_id", "")],
+        ))
+        before_actions = [a.action.value for a in answer.next_best_actions.final]
+        answer.case.fraud_probability = probability
+        answer.next_best_actions.final = self.policy_engine.recommend(
+            trigger_type=answer.trigger.get("type", ""),
+            fraud_probability=probability,
+            risk_level="UNKNOWN",
+            confidence=min(1.0, 0.6 + (0.2 if outcome else 0.0)),
+            pattern=answer.case.pattern,
+            exposure_usd=answer.case.exposure_usd,
+            num_signals=len(answer.case.evidence),
+            num_connected_cards=len(answer.case.connected_card_ids),
+            num_shared_devices=len(answer.case.connected_device_profiles),
+            has_prior_confirmed_fraud=False,
+            customer_response=outcome or None,
+        )
+        after_actions = [a.action.value for a in answer.next_best_actions.final]
+        answer.next_best_actions.what_changed = (
+            "changed after external evidence"
+            if before_actions != after_actions or previous_probability != probability
+            else "nothing"
+        )
+        answer.reassessment_history.append({
+            "stage": "POST_EVIDENCE",
+            "request_id": request_id,
+            "risk_before": previous_probability,
+            "risk_after": probability,
+            "action_before": before_actions,
+            "action_after": after_actions,
+            "evidence_causing_change": [f"evidence-request:{request_id}"],
+            "change_summary": answer.next_best_actions.what_changed,
+        })
+        if outcome == "denied" or probability >= 0.80:
+            answer.case.verdict = Verdict.fraud
+            answer.case.status = CaseStatus.closed_fraud
+            transition(answer.lifecycle_state, LifecycleState.ready_for_action)
+            answer.lifecycle_state = LifecycleState.ready_for_action
+        elif outcome == "confirmed" or probability <= 0.20:
+            answer.case.verdict = Verdict.legitimate
+            answer.case.status = CaseStatus.closed_legitimate
+            transition(answer.lifecycle_state, LifecycleState.ready_for_action)
+            answer.lifecycle_state = LifecycleState.ready_for_action
+        else:
+            answer.case.verdict = Verdict.uncertain
+            answer.case.status = CaseStatus.escalated
+            transition(answer.lifecycle_state, LifecycleState.escalated)
+            answer.lifecycle_state = LifecycleState.escalated
+        answer.stop_reason = "POST_EVIDENCE_REASSESSMENT_COMPLETE"
+        answer.validation["external_evidence_grounded"] = True
+        answer.audit.append({
+            "step": 8,
+            "action": "reassessment_completed",
+            "status": "complete",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "request_id": request_id,
+            "outcome": outcome,
+        })
+        return answer
 
     # ── Main entry point ──────────────────────────────────────────────────────
 
@@ -200,50 +297,69 @@ class FraudAgent:
             self._audit(audit, 6, "initial_recommendation", "complete", {
                 "actions": [a.action.value for a in state.initial_actions],
             })
+            state.initial_assessment = self._assessment_snapshot(state, risk)
 
             # Step 7: Uncertainty check — request evidence if needed
             self._audit(audit, 7, "uncertainty_check", "start")
             need_more, evidence_request = self._check_uncertainty(state, risk)
             if need_more and evidence_request:
+                evidence_request.reason = self._evidence_request_reason(evidence_request, risk)
                 state.evidence_requests.append(evidence_request)
-                simulated_response = self._simulate_evidence_response(
-                    state, evidence_request
-                )
-                state.evidence_received.append(simulated_response)
-                state.tool_calls += 1
-                self._audit(audit, 7, "evidence_request", "complete", {
+                self._audit(audit, 7, "evidence_request", "requested", {
                     "type": evidence_request.type.value,
-                    "assumed_response": evidence_request.assumed_response,
+                    "status": "awaiting_external_response",
                 })
 
-                # Step 8: Re-assess after new evidence
-                self._audit(audit, 8, "re_assessment", "start")
-                customer_resp = simulated_response.get("outcome")
-                state.fraud_probability = self._re_assess_probability(
-                    state, simulated_response
-                )
-                state.final_actions = self.policy_engine.recommend(
-                    trigger_type=state.trigger_type,
-                    fraud_probability=state.fraud_probability,
-                    risk_level=state.risk_level,
-                    confidence=min(state.confidence + 0.2, 1.0),
-                    pattern=state.pattern,
-                    exposure_usd=state.exposure_usd,
-                    num_signals=risk.evidence_count + 1,
-                    num_connected_cards=len(exposure.connected_card_ids),
-                    num_shared_devices=len(exposure.connected_device_profiles),
-                    has_prior_confirmed_fraud=any(
-                        c.get("outcome") == "confirmed_fraud" for c in state.prior_cases
-                    ),
-                    customer_response=customer_resp,
-                )
-                state.what_changed = self._diff_actions(
-                    state.initial_actions, state.final_actions, simulated_response
-                )
-                self._audit(audit, 8, "re_assessment", "complete", {
-                    "new_fraud_probability": state.fraud_probability,
-                    "final_actions": [a.action.value for a in state.final_actions],
-                })
+                if settings.allow_simulated_evidence:
+                    simulated_response = self._simulate_evidence_response(
+                        state, evidence_request
+                    )
+                    state.evidence_received.append(simulated_response)
+                    state.tool_calls += 1
+                    evidence_request.assumed_response = simulated_response.get("detail", "")
+                    self._audit(audit, 7, "evidence_request", "simulated", {
+                        "type": evidence_request.type.value,
+                        "assumed_response": evidence_request.assumed_response,
+                    })
+
+                    # Step 8: Re-assess only after an actual or explicitly
+                    # simulated response has been received.
+                    self._audit(audit, 8, "re_assessment", "start")
+                    customer_resp = simulated_response.get("outcome")
+                    state.fraud_probability = self._re_assess_probability(
+                        state, simulated_response
+                    )
+                    state.final_actions = self.policy_engine.recommend(
+                        trigger_type=state.trigger_type,
+                        fraud_probability=state.fraud_probability,
+                        risk_level=state.risk_level,
+                        confidence=min(state.confidence + 0.2, 1.0),
+                        pattern=state.pattern,
+                        exposure_usd=state.exposure_usd,
+                        num_signals=risk.evidence_count + 1,
+                        num_connected_cards=len(exposure.connected_card_ids),
+                        num_shared_devices=len(exposure.connected_device_profiles),
+                        has_prior_confirmed_fraud=any(
+                            c.get("outcome") == "confirmed_fraud" for c in state.prior_cases
+                        ),
+                        customer_response=customer_resp,
+                    )
+                    state.what_changed = self._diff_actions(
+                        state.initial_actions, state.final_actions, simulated_response
+                    )
+                    self._audit(audit, 8, "re_assessment", "complete", {
+                        "new_fraud_probability": state.fraud_probability,
+                        "final_actions": [a.action.value for a in state.final_actions],
+                    })
+                else:
+                    state.final_actions = state.initial_actions
+                    state.verdict = Verdict.uncertain
+                    state.status = CaseStatus.escalated
+                    state.what_changed = "pending external evidence"
+                    state.stop_reason = "AWAITING_EXTERNAL_EVIDENCE"
+                    self._audit(audit, 8, "re_assessment", "pending", {
+                        "reason": "External evidence response is required before reassessment.",
+                    })
             else:
                 state.final_actions = state.initial_actions
                 state.what_changed = "nothing"
@@ -273,12 +389,13 @@ class FraudAgent:
             })
 
             # Stopping reason
-            state.stop_reason = self.policy_engine.get_stopping_reason(
-                state.fraud_probability,
-                state.confidence,
-                state.evidence_received[0].get("outcome") if state.evidence_received else None,
-                len(state.graph_evidence),
-            ) or "Investigation completed — all applicable policy rules evaluated."
+            if not state.stop_reason:
+                state.stop_reason = self.policy_engine.get_stopping_reason(
+                    state.fraud_probability,
+                    state.confidence,
+                    state.evidence_received[0].get("outcome") if state.evidence_received else None,
+                    len(state.graph_evidence),
+                ) or "Investigation completed — all applicable policy rules evaluated."
 
         except Exception as exc:  # noqa: BLE001
             logger.exception("Investigation failed for %s: %s", state.case_id, exc)
@@ -663,6 +780,7 @@ class FraudAgent:
             return self._deterministic_probability(state, pattern_result, risk)
 
         try:
+            state.llm_calls += 1
             return await self._call_llm(state, llm_ctx, pattern_result, risk)
         except Exception as exc:  # noqa: BLE001
             logger.warning("LLM call failed, using deterministic: %s", exc)
@@ -682,9 +800,9 @@ class FraudAgent:
         # Pattern confidence
         if pattern_result.pattern != FraudPattern.none:
             p = max(p, pattern_result.confidence)
-        # Penalize if no clear pattern
-        if pattern_result.pattern == FraudPattern.none:
-            p = min(p, 0.55)
+        # No documented pattern is not evidence of legitimate activity. Keep
+        # the deterministic risk signal and expose the missing typology as
+        # uncertainty through the existing risk assessment fields.
         return {"fraud_probability": round(p, 3), "tokens": 0}
 
     async def _call_llm(
@@ -692,7 +810,7 @@ class FraudAgent:
     ) -> dict[str, Any]:
         """Structured LLM call — returns fraud_probability and tokens."""
         provider = settings.llm_provider.lower()
-        if provider in {"grok", "openai"}:
+        if provider in {"grok", "groq", "openai"}:
             return await self._call_openai(state, ctx, pattern_result, risk)
         elif provider == "anthropic":
             return await self._call_anthropic(state, ctx, pattern_result, risk)
@@ -703,41 +821,15 @@ class FraudAgent:
         self, state: InvestigationState, ctx: dict, pattern_result, risk,
     ) -> dict[str, Any]:
         try:
-            import openai
             provider = settings.llm_provider.lower()
-            client_kwargs = {
-                "api_key": settings.llm_api_key,
-                "timeout": settings.llm_timeout_s,
-            }
-            if settings.llm_base_url:
-                client_kwargs["base_url"] = settings.llm_base_url
-            client = openai.AsyncOpenAI(**client_kwargs)
             system_prompt = self._build_system_prompt()
             user_prompt = self._build_user_prompt(state, ctx)
-            request_kwargs = {
-                "model": settings.llm_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": 0.1,
-                "max_tokens": 800,
-            }
-            request_kwargs["response_format"] = {"type": "json_object"}
-            resp = await client.chat.completions.create(
-                **request_kwargs,
+            generation = await get_llm_provider(settings).generate_structured(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
             )
-            content = resp.choices[0].message.content or ""
-            try:
-                data = json.loads(content, strict=False)
-            except json.JSONDecodeError:
-                start, end = content.find("{"), content.rfind("}")
-                if start < 0 or end <= start:
-                    raise
-                data = json.loads(content[start:end + 1], strict=False)
-            if not isinstance(data, dict):
-                raise ValueError("LLM response JSON must be an object")
-            tokens = resp.usage.total_tokens if resp.usage else 0
+            data = generation.data
+            tokens = generation.tokens or 0
             fp = float(data.get("fraud_probability", risk.risk_score))
             accepted, grounding = validate_grounded_llm_output(ctx, data)
             state.validation.update({
@@ -745,6 +837,10 @@ class FraudAgent:
                 "llm_runtime": "AVAILABLE",
                 "llm_fallback_used": False,
                 "llm_error": "",
+                "llm_latency_ms": generation.latency_ms,
+                "llm_model": generation.model,
+                "llm_api_calls": generation.metadata.get("api_calls", 1),
+                "llm_backup_used": generation.metadata.get("backup_used", False),
                 **grounding,
             })
             state.graph_evidence.extend([
@@ -842,17 +938,20 @@ class FraudAgent:
         fp = state.fraud_probability
         uncertainty = risk.uncertainty_flags
 
-        # Never request evidence if we are already certain
-        if fp >= 0.85 or fp <= 0.15:
-            return False, None
-
         # Customer report: ask for confirmation if not already done
-        if state.trigger_type == "customer_report" and 0.30 <= fp <= 0.90:
+        # Authorization remains unresolved even when the model probability is
+        # high; customer validation can change the permitted action.
+        if state.trigger_type == "customer_report" and not state.evidence_received:
             return True, EvidenceRequest(
                 type=EvidenceRequestType.customer_validation,
                 asked_after_step=state.step,
-                assumed_response="",  # filled by simulator
+                assumed_response="",
+                reason="Authorization is unresolved; a verified customer response can change the permitted action.",
             )
+
+        # Never request generic evidence if we are already certain.
+        if fp >= 0.85 or fp <= 0.15:
+            return False, None
 
         # R1: single weak signal
         if fp < 0.70 and risk.evidence_count <= 1:
@@ -860,6 +959,7 @@ class FraudAgent:
                 type=EvidenceRequestType.step_up_auth,
                 asked_after_step=state.step,
                 assumed_response="",
+                reason="Step-up authentication can distinguish authorized activity from account misuse.",
             )
 
         # High uncertainty flags
@@ -868,9 +968,29 @@ class FraudAgent:
                 type=EvidenceRequestType.analyst_info,
                 asked_after_step=state.step,
                 assumed_response="",
+                reason="Additional analyst information may resolve material uncertainty flags.",
             )
 
         return False, None
+
+    @staticmethod
+    def _evidence_request_reason(request: EvidenceRequest, risk: Any) -> str:
+        return request.reason or (
+            f"Evidence gap {request.type.value}; current assessment has "
+            f"{risk.evidence_count} supporting signal(s) and unresolved uncertainty."
+        )
+
+    @staticmethod
+    def _assessment_snapshot(state: InvestigationState, risk: Any) -> dict[str, Any]:
+        return {
+            "fraud_probability": round(state.fraud_probability, 3),
+            "risk_score": round(state.risk_score, 3),
+            "confidence": round(state.confidence, 3),
+            "pattern": state.pattern.value,
+            "actions": [a.model_dump(mode="json") for a in state.initial_actions],
+            "uncertainty": list(state.uncertainty_flags),
+            "evidence_count": risk.evidence_count,
+        }
 
     def _simulate_evidence_response(
         self,
@@ -970,6 +1090,10 @@ class FraudAgent:
     # ── Verdict finalization ──────────────────────────────────────────────────
 
     def _finalize_verdict(self, state: InvestigationState) -> None:
+        if state.stop_reason == "AWAITING_EXTERNAL_EVIDENCE":
+            state.verdict = Verdict.uncertain
+            state.status = CaseStatus.escalated
+            return
         fp = state.fraud_probability
         evidence_responses = [r.get("outcome") for r in state.evidence_received]
 
@@ -1069,6 +1193,13 @@ class FraudAgent:
 
         return CaseAnswer(
             case_id=state.case_id,
+            trigger={
+                "type": state.trigger_type,
+                "text": state.trigger_text,
+                "transaction_id": state.flagged_txn_id,
+                "card_id": state.card_id,
+                "customer_id": state.customer_id,
+            },
             case=case_record,
             evidence_requests=state.evidence_requests,
             next_best_actions=NextBestActions(
@@ -1079,6 +1210,7 @@ class FraudAgent:
             sar=state.sar,
             stop_reason=state.stop_reason,
             tool_calls=state.tool_calls,
+            llm_calls=state.llm_calls,
             tokens=state.tokens,
             latency_s=round(time.monotonic() - t0, 2),
             runtime={
@@ -1099,6 +1231,24 @@ class FraudAgent:
             },
             policy_evidence=state.policy_evidence,
             typology_evidence=state.typology_evidence,
+            lifecycle_state=(
+                LifecycleState.awaiting_external_evidence
+                if state.stop_reason == "AWAITING_EXTERNAL_EVIDENCE"
+                else LifecycleState.escalated if state.status == CaseStatus.escalated
+                else LifecycleState.closed if state.status in {
+                    CaseStatus.closed_fraud, CaseStatus.closed_legitimate
+                } else LifecycleState.ready_for_action
+            ),
+            initial_assessment=state.initial_assessment,
+            reassessment_history=[],
+            explanation={
+                "summary": self._generate_summary(state, exposure_obj),
+                "evidence_used": [e.ref for e in state.graph_evidence[:15]],
+                "missing_evidence": list(state.uncertainty_flags),
+                "why_evidence_requested": [r.reason for r in state.evidence_requests],
+                "remaining_uncertainty": list(state.uncertainty_flags),
+                "stop_reason": state.stop_reason,
+            },
         )
 
     def _generate_summary(self, state: InvestigationState, exposure) -> str:

@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from uuid import uuid4
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,6 +64,17 @@ def _init_db() -> None:
                 ts TEXT,
                 data_json TEXT
             );
+            CREATE TABLE IF NOT EXISTS evidence_requests (
+                request_id TEXT PRIMARY KEY,
+                case_id TEXT NOT NULL,
+                evidence_type TEXT NOT NULL,
+                requested_from TEXT,
+                reason TEXT,
+                status TEXT NOT NULL,
+                response_json TEXT,
+                created_at TEXT NOT NULL,
+                received_at TEXT
+            );
         """)
 
 
@@ -91,6 +103,16 @@ class CaseManager:
                     answer.model_dump_json(),
                 ),
             )
+            for request in answer.evidence_requests:
+                con.execute(
+                    "INSERT OR IGNORE INTO evidence_requests "
+                    "(request_id, case_id, evidence_type, requested_from, reason, status, response_json, created_at, received_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (request.request_id, answer.case_id, request.type.value,
+                     request.requested_from, request.reason, request.status,
+                     json.dumps(request.response), request.created_at.isoformat(),
+                     request.received_at.isoformat() if request.received_at else None),
+                )
 
     def get_answer(self, case_id: str) -> Optional[CaseAnswer]:
         with _conn() as con:
@@ -149,3 +171,51 @@ class CaseManager:
 
     def update_answer(self, answer: CaseAnswer) -> None:
         self.save_answer(answer)
+
+    def create_evidence_request(self, case_id: str, request: dict[str, Any]) -> dict[str, Any]:
+        request_id = request.get("request_id") or str(uuid4())
+        created_at = request.get("created_at") or datetime.now(timezone.utc).isoformat()
+        record = {
+            "request_id": request_id,
+            "case_id": case_id,
+            "evidence_type": request.get("type", "analyst_info"),
+            "requested_from": request.get("requested_from", "external_provider"),
+            "reason": request.get("reason", "Additional evidence required."),
+            "status": "pending",
+            "response": {},
+            "created_at": str(created_at),
+            "received_at": None,
+        }
+        with _conn() as con:
+            con.execute(
+                "INSERT OR IGNORE INTO evidence_requests "
+                "(request_id, case_id, evidence_type, requested_from, reason, status, response_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (request_id, case_id, record["evidence_type"], record["requested_from"],
+                 record["reason"], "pending", "{}", record["created_at"]),
+            )
+        return self.get_evidence_request(request_id) or record
+
+    def get_evidence_request(self, request_id: str) -> Optional[dict[str, Any]]:
+        with _conn() as con:
+            row = con.execute(
+                "SELECT * FROM evidence_requests WHERE request_id = ?", (request_id,)
+            ).fetchone()
+        if not row:
+            return None
+        item = dict(row)
+        item["response"] = json.loads(item.pop("response_json") or "{}")
+        return item
+
+    def fulfill_evidence_request(
+        self, request_id: str, response: dict[str, Any], received_at: str
+    ) -> dict[str, Any]:
+        with _conn() as con:
+            cursor = con.execute(
+                "UPDATE evidence_requests SET status = 'fulfilled', response_json = ?, received_at = ? "
+                "WHERE request_id = ? AND status = 'pending'",
+                (json.dumps(response), received_at, request_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("Evidence request is missing or already fulfilled")
+        return self.get_evidence_request(request_id) or {}
