@@ -16,6 +16,7 @@ import json
 import hashlib
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator
@@ -38,7 +39,11 @@ from ..models.case import (
     FraudPattern,
     InvestigationState,
     LifecycleState,
+    EvidenceSummary,
+    MemoryMetadata,
     NextBestActions,
+    RecommendationSummary,
+    ReasoningMetadata,
     SAR,
     Verdict,
 )
@@ -53,6 +58,71 @@ from ..cases.state_machine import transition
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def enrich_case_answer(answer: CaseAnswer) -> CaseAnswer:
+    """Populate one canonical response shape for new and legacy stored answers."""
+    claims = [item.claim for item in answer.case.evidence]
+    trigger = dict(answer.trigger or {})
+
+    def first_match(pattern: str) -> str:
+        for claim in claims:
+            match = re.search(pattern, claim, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        return ""
+
+    trigger_type = str(trigger.get("type") or first_match(r"Alert triggered by ([a-z_]+)"))
+    trigger_txn = str(trigger.get("transaction_id") or first_match(r"(?:Refers to|transaction)\s+(\d{7,})"))
+    customer_id = str(trigger.get("customer_id") or first_match(r"Customer\s+(C\d+)"))
+    card_id = str(trigger.get("card_id") or next(
+        (entity for item in answer.case.evidence for entity in item.entity_ids if re.fullmatch(r"C\d+-K\d+", entity)),
+        "",
+    ))
+    message = str(trigger.get("message") or trigger.get("text") or next(
+        (match.group(1) for claim in claims for match in [re.search(r"message:\s*'([^']+)'", claim, re.IGNORECASE)] if match),
+        "",
+    ))
+
+    trigger.update({"type": trigger_type, "transaction_id": trigger_txn, "customer_id": customer_id, "card_id": card_id, "message": message})
+    answer.trigger = trigger
+    affected = list(answer.case.affected_txn_ids)
+    answer.transaction = {
+        "trigger_transaction_id": trigger_txn,
+        "primary_transaction_id": answer.case.first_suspicious_txn_id,
+        "affected_transaction_ids": affected,
+    }
+    answer.customer = {"id": customer_id} if customer_id else {}
+    observed_card_entities = sorted({
+        match.group(1) for claim in claims
+        for match in [re.search(r"Card\s+(\d+)", claim, re.IGNORECASE)] if match
+    })
+    answer.card = {"id": card_id, "graph_entity_ids": observed_card_entities, "customer_id": customer_id, "network": "Unknown", "type": "Unknown"} if card_id or observed_card_entities else {}
+
+    validation = answer.validation or {}
+    provider = str(validation.get("llm_provider") or "")
+    model = str(validation.get("llm_model") or "")
+    executed = bool(answer.llm_calls or validation.get("llm_api_calls") or validation.get("llm_runtime") == "AVAILABLE")
+    fallback = bool(validation.get("llm_fallback_used") or getattr(answer, "llm_backup_used", False))
+    grounded = validation.get("fabricated_entities") == 0 and validation.get("unsupported_claims") == 0
+    answer.reasoning = ReasoningMetadata(provider=provider, model=model, executed=executed, fallback=fallback, grounded=grounded)
+
+    readback_known = "case_memory_readback" in validation or "readback" in answer.case_memory
+    readback = answer.case_memory.get("readback") is True or validation.get("case_memory_readback") is True
+    readback_status = "verified" if readback else "failed" if readback_known and answer.case.written_to_graph else "not_returned"
+    answer.memory = MemoryMetadata(write={"status": "success" if answer.case.written_to_graph else "not_returned", "graph_id": answer.case.graph_case_id}, readback={"status": readback_status})
+
+    independent_count = len(answer.case.evidence)
+    stop_match = re.search(r"with\s+(\d+)\s+independent evidence", answer.stop_reason or "")
+    if stop_match:
+        independent_count = int(stop_match.group(1))
+    answer.evidence_summary = EvidenceSummary(items=list(answer.case.evidence), item_count=len(answer.case.evidence), independent_signal_count=independent_count)
+
+    initial = list(answer.next_best_actions.initial)
+    final = list(answer.next_best_actions.final)
+    changed = [item.action.value for item in initial] != [item.action.value for item in final] or answer.next_best_actions.what_changed not in ("", "nothing")
+    answer.recommendation = RecommendationSummary(initial=initial, final=final, changed=changed, change_reason=answer.next_best_actions.what_changed if changed else "No reassessment changed the initial action.")
+    return answer
 
 
 def validate_grounded_llm_output(
@@ -1280,7 +1350,7 @@ class FraudAgent:
             graph_case_id=state.graph_case_id,
         )
 
-        return CaseAnswer(
+        answer = CaseAnswer(
             case_id=state.case_id,
             trigger={
                 "type": state.trigger_type,
@@ -1313,6 +1383,7 @@ class FraudAgent:
             },
             audit=state.audit_trail,
             validation=state.validation,
+            grounding=state.validation,
             case_memory={
                 "written": state.written_to_graph,
                 "graph_case_id": state.graph_case_id,
@@ -1339,6 +1410,7 @@ class FraudAgent:
                 "stop_reason": state.stop_reason,
             },
         )
+        return enrich_case_answer(answer)
 
     def _generate_summary(self, state: InvestigationState, exposure) -> str:
         txn = state.flagged_txn or {}

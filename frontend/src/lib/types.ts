@@ -85,12 +85,14 @@ export type RuntimeValue =
 
 export interface CaseAnswer {
   case_id: string
+  trigger?: Record<string, unknown>
   case: CaseRecord
   evidence_requests: EvidenceRequest[]
   next_best_actions: NextBestActions
   sar: SAR
   stop_reason: string
   tool_calls: number
+  llm_calls?: number
   tokens: number
   latency_s: number
   audit?: AuditEntry[]
@@ -126,6 +128,21 @@ export interface CaseAnswer {
   reassessment_history?: ReassessmentEntry[]
   initial_assessment?: Record<string, unknown>
   action_decisions?: Record<string, { status: string; execution_mode?: string }>
+  lifecycle_state?: string
+  validation?: Record<string, unknown>
+  explanation?: Record<string, unknown>
+  mcp_calls?: Array<Record<string, unknown>>
+  transaction?: {
+    trigger_transaction_id?: string
+    primary_transaction_id?: string
+    affected_transaction_ids?: string[]
+  }
+  customer?: { id?: string }
+  card?: { id?: string; graph_entity_ids?: string[]; customer_id?: string; network?: string; type?: string }
+  reasoning?: { provider?: string; model?: string; executed?: boolean; fallback?: boolean; grounded?: boolean }
+  memory?: { write?: { status?: string; graph_id?: string }; readback?: { status?: string } }
+  evidence_summary?: { items?: EvidenceItem[]; item_count?: number; independent_signal_count?: number }
+  recommendation?: { initial?: ActionRecommendation[]; final?: ActionRecommendation[]; changed?: boolean; change_reason?: string | null }
 }
 
 export interface PolicyEvidenceItem {
@@ -141,6 +158,8 @@ export interface PolicyEvidenceItem {
   description?: string
   indicators?: string[]
   policy_rules?: string[]
+  matched?: boolean
+  required_approval?: string
 }
 
 export interface ReassessmentEntry {

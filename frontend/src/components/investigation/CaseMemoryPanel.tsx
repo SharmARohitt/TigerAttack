@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from "framer-motion"
 import type { CaseAnswer } from "@/lib/types"
 
 export function CaseMemoryPanel({ answer }: { answer: CaseAnswer }) {
-  const written     = answer.case.written_to_graph
-  const graphCaseId = answer.case.graph_case_id
+  const written     = answer.memory?.write?.status === "success" || answer.case.written_to_graph
+  const graphCaseId = answer.memory?.write?.graph_id || answer.case.graph_case_id
   const memory      = answer.case_memory
-  const readback    = memory?.readback ?? answer.grounding?.case_memory_readback
+  const readback    = answer.memory?.readback?.status === "verified" || memory?.readback === true || answer.grounding?.case_memory_readback === true
+  const readbackStatus = answer.memory?.readback?.status ?? (readback ? "verified" : "not_returned")
 
   const prevWritten = useRef(written)
   const [justWritten, setJustWritten] = useState(false)
@@ -53,8 +54,8 @@ export function CaseMemoryPanel({ answer }: { answer: CaseAnswer }) {
               GRAPH ID: <span className="text-[#D9A441]/70">{graphCaseId || "—"}</span>
             </div>
             <div className="font-mono-ui text-[8px] text-[#8B8D96]/50">
-              READBACK: <span className={readback ? "text-[#3DD68C]" : "text-[#E5484D]"}>
-                {readback ? "VERIFIED" : "NOT VERIFIED"}
+              READBACK: <span className={readback ? "text-[#3DD68C]" : "text-[#E8C547]"}>
+                {readbackStatus === "verified" ? "VERIFIED" : readbackStatus === "failed" ? "FAILED" : "NOT RETURNED"}
               </span>
             </div>
             {memory && Object.entries(memory)

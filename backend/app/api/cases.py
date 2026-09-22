@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from ..cases.case_manager import CaseManager
 from ..models.case import CaseAnswer, ActionType, EvidenceRequestType
-from ..agents.fraud_agent import FraudAgent
+from ..agents.fraud_agent import FraudAgent, enrich_case_answer
 from ..cases.state_machine import transition
 
 router = APIRouter(prefix="/cases", tags=["cases"])
@@ -20,7 +20,10 @@ async def get_case(case_id: str):
     ans = _mgr.get_answer(case_id)
     if not ans:
         raise HTTPException(404, f"Case {case_id} not found")
-    return ans
+    enriched = enrich_case_answer(ans)
+    if enriched.model_dump() != ans.model_dump():
+        _mgr.update_answer(enriched)
+    return enriched
 
 
 @router.get("/{case_id}/sar")

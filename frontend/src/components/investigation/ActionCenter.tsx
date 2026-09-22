@@ -20,18 +20,31 @@ function ActionCard({
   onDecision: (action: string, d: Decision) => void
 }) {
   const [loading, setLoading] = useState(false)
-  const decision = decisions[rec.action]
+  const [error, setError] = useState<string | null>(null)
+  const backendDecision = decisions[rec.action]
+  const decision = backendDecision
   const needsApproval = rec.route !== "auto"
 
   const handle = async (d: Decision) => {
     setLoading(true)
+    setError(null)
     try {
-      if (d === "approved") await approveAction(caseId, rec.action)
-      else await rejectAction(caseId, rec.action)
+      if (d === "approved") {
+        const result = await approveAction(caseId, rec.action)
+        if (result.approved !== true) {
+          setError("Backend did not confirm this decision")
+          return
+        }
+      } else {
+        const result = await rejectAction(caseId, rec.action)
+        if (result.rejected !== true) {
+          setError("Backend did not confirm this decision")
+          return
+        }
+      }
       onDecision(rec.action, d)
-    } catch {
-      // silent — still record in local state
-      onDecision(rec.action, d)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Decision request failed")
     } finally {
       setLoading(false)
     }
@@ -67,7 +80,7 @@ function ActionCard({
         </div>
 
         {/* Decision result */}
-        {decision && (
+            {decision && (
           <span className={cn(
             "font-mono-ui text-[9px] uppercase shrink-0",
             decision === "approved" ? "text-[#3DD68C]" : "text-[#E5484D]",
@@ -78,7 +91,7 @@ function ActionCard({
       </div>
 
       {/* Approval buttons for non-auto actions */}
-      {needsApproval && !decision && (
+            {needsApproval && !decision && (
         <div className="flex gap-1.5">
           <button
             onClick={() => handle("approved")}
@@ -107,6 +120,7 @@ function ActionCard({
           Agent may execute automatically
         </div>
       )}
+      {error && <div role="alert" className="font-mono-ui text-[8px] text-[var(--red-fx)]">{error}</div>}
     </div>
   )
 }
@@ -114,9 +128,10 @@ function ActionCard({
 export function ActionCenter({ answer }: { answer: CaseAnswer }) {
   const [decisions, setDecisions] = useState<Record<string, Decision>>(
     // Pre-populate from backend action_decisions if present
-    Object.fromEntries(
-      Object.entries(answer.action_decisions ?? {}).map(([k, v]) => [k, v.status as Decision])
-    )
+    Object.entries(answer.action_decisions ?? {}).reduce<Record<string, Decision>>((result, [key, value]) => {
+      if (value.status === "approved" || value.status === "rejected") result[key] = value.status
+      return result
+    }, {})
   )
 
   const onDecision = (action: string, d: Decision) =>

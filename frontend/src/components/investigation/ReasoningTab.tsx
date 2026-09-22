@@ -31,11 +31,9 @@ function ActionList({ actions, label }: { actions: ActionRecommendation[]; label
 
 export function ReasoningTab({ answer }: { answer: CaseAnswer }) {
   const g = answer.grounding
+  const reasoning = answer.reasoning
   const llmRuntime = g?.llm_runtime ?? answer.runtime?.llm
-  const fallbackActive =
-    llmRuntime === "FAILED" ||
-    g?.llm_fallback_used === true ||
-    answer.llm_backup_used === true
+  const fallbackActive = reasoning?.fallback === true || g?.llm_fallback_used === true
 
   const na = answer.next_best_actions
   const changed = na?.what_changed && na.what_changed !== "nothing"
@@ -115,9 +113,10 @@ export function ReasoningTab({ answer }: { answer: CaseAnswer }) {
             ? "DETERMINISTIC FALLBACK ACTIVE"
             : llmRuntime === "AVAILABLE"
               ? "LLM ACTIVE"
-              : llmRuntime ?? "STATUS UNKNOWN"}
+                : reasoning?.executed === true ? "LIVE" : llmRuntime ?? "NOT RETURNED"}
         </div>
-        {g?.llm_provider && (
+              {reasoning?.provider && <div className="font-mono-ui text-[9px] text-[var(--cyan)] uppercase">{reasoning.provider}{reasoning.model ? ` / ${reasoning.model}` : ""}</div>}
+        {!reasoning?.provider && g?.llm_provider && (
           <div className="font-mono-ui text-[9px] text-[#8B8D96]">
             {g.llm_provider}{g.llm_model ? ` / ${g.llm_model}` : ""}
           </div>

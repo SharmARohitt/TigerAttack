@@ -3,16 +3,10 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Volume2, VolumeX, ChevronRight } from "lucide-react"
 import { TigerCanvas } from "./TigerCanvas"
+import { BlurText } from "@/components/react-bits/BlurText"
 import { RuntimePill } from "@/components/ui/RuntimePill"
 import { getHealth, listCases } from "@/lib/api"
 import type { HealthStatus, CaseListItem } from "@/lib/types"
-
-const CASE_PACK_IDS = [
-  "HHG-001","HHG-002","HHG-003","HHG-004","HHG-005",
-  "HHG-006","HHG-007","HHG-008","HHG-009","HHG-010",
-  "HHG-011","HHG-012","HHG-013","HHG-014","HHG-015",
-  "HHG-016","HHG-017","HHG-018","HHG-019","HHG-020",
-]
 
 interface Props { onLaunch: (caseId: string) => void }
 
@@ -64,16 +58,13 @@ export function HeroSection({ onLaunch }: Props) {
     }
   }, [inputId, selectedId, handleLaunch])
 
-  // Derive case IDs: backend list first, fall back to static pack
-  const displayIds = cases.length > 0
-    ? cases.map(c => c.case_id)
-    : CASE_PACK_IDS
+  const displayIds = cases.map(c => c.case_id)
 
   const tg  = health?.tigergraph === "connected" ? "CONNECTED"  : health ? "UNAVAILABLE" : null
   const mcp = health?.mcp         === "connected" ? "CONNECTED"  : health ? "UNAVAILABLE" : null
 
   return (
-    <div className="relative min-h-screen flex flex-col overflow-hidden bg-[#0A0A0C] scanlines">
+    <div className="relative min-h-screen flex flex-col overflow-hidden bg-[var(--ink)] scanlines tiger-noise">
       {/* Background scene */}
       <TigerCanvas activated={activated} />
 
@@ -85,12 +76,12 @@ export function HeroSection({ onLaunch }: Props) {
       <div className="scan-line" aria-hidden />
 
       {/* ── Top bar ──────────────────────────────────────────────────── */}
-      <header className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/08">
+      <header className="relative z-10 flex items-center justify-between px-6 py-4 border-b hairline">
         <div className="flex items-center gap-2.5">
           <div className="w-6 h-6 rounded border border-[#D9A441]/40 bg-[#D9A441]/08 flex items-center justify-center">
-            <span className="text-[#D9A441] text-[10px]">⟁</span>
+            <span className="text-[var(--amber)] text-[10px]">TA</span>
           </div>
-          <span className="font-mono-ui text-xs tracking-[0.4em] text-[#D9A441] uppercase">Tiger Effect</span>
+          <span className="font-mono-ui text-xs tracking-[0.4em] text-[var(--amber)] uppercase">Tiger Attack</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {tg  && <RuntimePill label="GRAPH" value={tg} />}
@@ -112,26 +103,26 @@ export function HeroSection({ onLaunch }: Props) {
         >
           {/* Tag */}
           <p className="font-mono-ui text-[10px] tracking-[0.55em] text-[#8B8D96] mb-5 uppercase">
-            Fraud Investigation Intelligence Command Center
+            Graph-first investigation // MCP // grounded evidence // case memory
           </p>
 
           {/* H1 */}
           <h1 className="font-sans font-light uppercase tracking-tight mb-3 leading-none"
               style={{ fontSize: "clamp(2.5rem,6vw,5.5rem)" }}>
-            <span className="text-[#D9A441]">TIGER</span>
-            <span className="text-[#F2F1ED]"> EFFECT</span>
+            <span className="text-[var(--amber)]">TIGER</span>
+            <span className="text-[var(--text)]"> ATTACK</span>
           </h1>
 
           {/* Sub-headline */}
           <p className="text-[#F2F1ED] text-lg md:text-xl font-light mb-3 tracking-wide">
-            Hunt the evidence.{" "}
-            <span className="text-[#4FD1E8]/80">Map the fraud.</span>
+            <BlurText text="Trace the evidence." delay={70} stepDuration={0.42} />{" "}
+            <span className="text-[var(--cyan)]/80"><BlurText text="Follow the connection." delay={70} stepDuration={0.42} /></span>
           </p>
 
           {/* Body */}
           <p className="text-[#8B8D96] text-sm max-w-xl mb-10 leading-relaxed">
-            An evidence-grounded fraud investigation system that connects transactions,
-            identities, behavior, historical cases and policy into one investigation graph.
+            Intelligent fraud investigation for teams that need every decision grounded,
+            every relationship visible, and every next move policy-bound.
           </p>
 
           {/* Input + CTAs */}
@@ -182,7 +173,7 @@ export function HeroSection({ onLaunch }: Props) {
                          hover:border-white/20 hover:text-[#F2F1ED]
                          transition-colors duration-200 disabled:opacity-40"
             >
-              EXPLORE CASES
+              OPEN CASE QUEUE
             </motion.button>
           </div>
 
@@ -201,7 +192,6 @@ export function HeroSection({ onLaunch }: Props) {
                 </div>
                 <div className="max-h-52 overflow-y-auto">
                   {displayIds.map(id => {
-                    const meta = cases.find(c => c.case_id === id)
                     return (
                       <button
                         key={id}
@@ -216,11 +206,7 @@ export function HeroSection({ onLaunch }: Props) {
                                    hover:text-[#D9A441] transition-colors duration-100 text-left"
                       >
                         <span>{id}</span>
-                        {meta && (
-                          <span className="text-[#8B8D96] text-[9px]">
-                            {meta.verdict?.toUpperCase()}
-                          </span>
-                        )}
+                        <span className="text-[#8B8D96] text-[9px]">READY TO SCAN</span>
                         <ChevronRight size={12} className="text-[#8B8D96]" aria-hidden />
                       </button>
                     )
@@ -244,10 +230,41 @@ export function HeroSection({ onLaunch }: Props) {
             <span className={mcp === "CONNECTED" ? "text-[#3DD68C]/70" : "text-[#E5484D]/60"}>
               ◆ {mcp ? `MCP ${mcp}` : "MCP CHECKING…"}
             </span>
-            <span className="text-[#3DD68C]/70">◆ EVIDENCE ENGINE READY</span>
+            <span className="text-white/35">◆ EVIDENCE STATUS FOLLOWS CASE</span>
           </div>
         </motion.div>
       </main>
+
+      <aside className="hidden lg:block absolute z-10 right-10 xl:right-16 top-28 w-72 border hairline bg-[var(--surface)]/80 backdrop-blur-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b hairline">
+          <div className="eyebrow text-[var(--muted)]">Open case queue</div>
+          <span className="forensic text-[9px] text-[var(--cyan)]">{cases.length ? `${cases.length} loaded` : "NOT RETURNED"}</span>
+        </div>
+        {cases.length > 0 ? (
+          <div className="divide-y divide-white/[.06]">
+            {cases.slice(0, 5).map((item, index) => (
+              <button
+                key={item.case_id}
+                onClick={() => handleLaunch(item.case_id)}
+                disabled={launching}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--amber)]/[.06] transition-colors disabled:opacity-50"
+              >
+                <span className="forensic text-[10px] text-[var(--amber)] w-12">{item.case_id}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block forensic text-[9px] text-[var(--amber-bright)] uppercase truncate">READY TO SCAN</span>
+                  <span className="block forensic text-[9px] text-white/30 mt-0.5">FRESH RESULT ON INVESTIGATION</span>
+                </span>
+                <span className="forensic text-[10px] text-white/30">{String(index + 1).padStart(2, "0")}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-7 text-center">
+            <div className="forensic text-[10px] text-white/35">CASE QUEUE UNAVAILABLE</div>
+            <div className="text-[10px] text-white/20 mt-1">Connect the backend to inspect live cases.</div>
+          </div>
+        )}
+      </aside>
 
       {/* ── Mute control ─────────────────────────────────────────────── */}
       <div className="absolute bottom-6 right-6 z-10">

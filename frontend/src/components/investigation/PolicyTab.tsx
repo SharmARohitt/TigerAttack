@@ -23,6 +23,10 @@ function PolicyCard({ item, source }: { item: PolicyEvidenceItem; source: string
         <div className="flex-1 min-w-0">
           <div className="text-xs text-[#F2F1ED]/90 font-medium leading-snug">{title}</div>
           <div className="font-mono-ui text-[8px] text-[#8B8D96]/40 mt-0.5 uppercase tracking-wider">{source}</div>
+          <div className="font-mono-ui text-[8px] mt-1 uppercase tracking-wider">
+            {item.matched === true ? <span className="text-[var(--green-fx)]">MATCHED</span> : item.matched === false ? <span className="text-white/35">NOT MATCHED</span> : <span className="text-[var(--yellow-fx)]">MATCH STATUS NOT RETURNED</span>}
+            {item.required_approval && <span className="text-[var(--amber)]">{" // "}{item.required_approval}</span>}
+          </div>
           {!open && body && (
             <p className="text-[10px] text-[#8B8D96]/60 mt-1 line-clamp-1">{body}</p>
           )}
@@ -88,7 +92,7 @@ export function PolicyTab({ answer }: { answer: CaseAnswer }) {
   if (!total) {
     return (
       <div className="flex items-center justify-center h-32 font-mono-ui text-xs text-[#8B8D96]/40 p-4">
-        No policy evidence retrieved for this case
+        No policy evidence returned for this case
       </div>
     )
   }

@@ -1,22 +1,27 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import localFont from "next/font/local"
 import "./globals.css"
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  variable: "--font-inter",
+const geist = localFont({
+  src: "./fonts/GeistVF.woff",
+  variable: "--font-geist",
+  display: "swap",
+})
+
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-geist-mono",
   display: "swap",
 })
 
 export const metadata: Metadata = {
-  title: "TIGER EFFECT — Fraud Investigation Intelligence",
-  description: "Hunt the evidence. Map the fraud.",
+  title: "TIGER ATTACK — Fraud Investigation Command Center",
+  description: "Trace the evidence. Follow the connection. Make the next move.",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body
         className="bg-[#0A0A0C] text-[#F2F1ED] antialiased"
         suppressHydrationWarning

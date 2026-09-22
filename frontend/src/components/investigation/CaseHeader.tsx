@@ -16,9 +16,13 @@ function Field({ label, value, mono = false }: { label: string; value: string | 
   )
 }
 
+function stringValue(value: unknown): string {
+  return typeof value === "string" && value.length > 0 ? value : "Not returned"
+}
+
 export function CaseHeader({ answer }: Props) {
   const c = answer.case
-  const customerId = c.evidence.flatMap(e => e.entity_ids).find(id => /^C\d+$/.test(id))
+  const customerId = answer.customer?.id
 
   return (
     <div className="space-y-4 p-4">
@@ -48,13 +52,23 @@ export function CaseHeader({ answer }: Props) {
 
       <div className="border-t border-white/08" />
 
+      {answer.trigger && (
+        <div className="space-y-2">
+          <div className="font-mono-ui text-[9px] text-[#8B8D96]/60 tracking-wider uppercase">TRIGGER</div>
+          <Field label="TYPE" value={stringValue(answer.trigger.type)} mono />
+          <Field label="MESSAGE" value={stringValue(answer.trigger.message)} />
+          <Field label="TRANSACTION" value={stringValue(answer.transaction?.trigger_transaction_id)} mono />
+          <Field label="CUSTOMER" value={stringValue(answer.customer?.id)} mono />
+        </div>
+      )}
+
       {/* Metrics */}
       <div className="space-y-3">
         <Field label="EXPOSURE"    value={formatUSD(c.exposure_usd)} mono />
         <Field label="PATTERN"     value={patternLabel(c.pattern)} mono />
-        <Field label="CARD ID"     value={maskId(answer.case_id + "-K1", 6)} mono />
+        <Field label="CARD ID"     value={stringValue(answer.card?.id)} mono />
         {customerId && <Field label="CUSTOMER"  value={maskId(customerId, 5)} mono />}
-        <Field label="TXN (FIRST)" value={c.first_suspicious_txn_id || c.affected_txn_ids[0] || "—"} mono />
+        <Field label="TXN (PRIMARY)" value={stringValue(answer.transaction?.primary_transaction_id)} mono />
         <Field label="TOOL CALLS"  value={String(answer.tool_calls)} mono />
         <Field label="LATENCY"     value={`${answer.latency_s?.toFixed(2) ?? "—"}s`} mono />
       </div>
@@ -66,14 +80,7 @@ export function CaseHeader({ answer }: Props) {
             AFFECTED TRANSACTIONS
           </div>
           <div className="flex flex-wrap gap-1">
-            {c.affected_txn_ids.slice(0, 6).map(id => (
-              <span key={id} className="font-mono-ui text-[9px] px-1.5 py-0.5 rounded bg-[#D9A441]/08 border border-[#D9A441]/20 text-[#D9A441]/80">
-                {id}
-              </span>
-            ))}
-            {c.affected_txn_ids.length > 6 && (
-              <span className="font-mono-ui text-[9px] text-[#8B8D96]/50">+{c.affected_txn_ids.length - 6}</span>
-            )}
+            {c.affected_txn_ids.map(id => <span key={id} className="font-mono-ui text-[9px] px-1.5 py-0.5 rounded bg-[#D9A441]/08 border border-[#D9A441]/20 text-[#D9A441]/80">{id}</span>)}
           </div>
         </div>
       )}

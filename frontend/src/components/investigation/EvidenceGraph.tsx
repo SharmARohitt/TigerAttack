@@ -1,9 +1,9 @@
 "use client"
 /**
  * d3-force evidence graph.
- * Nodes/edges built ONLY from the backend evidence array — no fabrication.
+ * Nodes/edges built only from backend evidence plus the real case identifier.
  */
-import { useEffect, useRef, useMemo, useCallback } from "react"
+import { useEffect, useRef, useMemo, useCallback, useState } from "react"
 import type { EvidenceItem, GraphNode, GraphEdge } from "@/lib/types"
 
 const TYPE_COLORS: Record<string, string> = {
@@ -30,14 +30,20 @@ function safeN(v: number | undefined, fallback: number): number {
   return isFinite(v as number) ? (v as number) : fallback
 }
 
-function buildGraph(evidence: EvidenceItem[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
+type GraphFilter = "all" | GraphNode["type"]
+
+function buildGraph(caseId: string, evidence: EvidenceItem[], filter: GraphFilter): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodeMap = new Map<string, GraphNode>()
   const edges: GraphEdge[] = []
   const seen  = new Set<string>()
 
-  nodeMap.set("__inv__", { id: "__inv__", label: "CASE", type: "case", x: 0, y: 0, vx: 0, vy: 0 })
+  nodeMap.set(caseId, { id: caseId, label: caseId, type: "case", x: 0, y: 0, vx: 0, vy: 0 })
 
-  for (const ev of evidence.slice(0, 30)) {
+  const visibleEvidence = filter === "all"
+    ? evidence
+    : evidence.filter(ev => ev.entity_ids.some(id => inferType(id) === filter))
+
+  for (const ev of visibleEvidence.slice(0, 30)) {
     for (const eid of ev.entity_ids) {
       if (!eid) continue
       const short = eid.length > 12 ? eid.slice(0,10)+"…" : eid
@@ -49,10 +55,10 @@ function buildGraph(evidence: EvidenceItem[]): { nodes: GraphNode[]; edges: Grap
           x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, vx: 0, vy: 0,
         })
       }
-      const edgeKey = `__inv__::${eid}`
+      const edgeKey = `${caseId}::${eid}`
       if (!seen.has(edgeKey)) {
         seen.add(edgeKey)
-        edges.push({ source: "__inv__", target: eid })
+        edges.push({ source: caseId, target: eid })
       }
     }
     for (let i = 0; i < ev.entity_ids.length - 1; i++) {
@@ -69,11 +75,13 @@ function buildGraph(evidence: EvidenceItem[]): { nodes: GraphNode[]; edges: Grap
 }
 
 interface Props {
+  caseId: string
   evidence: EvidenceItem[]
   onNodeClick?: (nodeId: string) => void
 }
 
-export function EvidenceGraph({ evidence, onNodeClick }: Props) {
+export function EvidenceGraph({ caseId, evidence, onNodeClick }: Props) {
+  const [filter, setFilter] = useState<GraphFilter>("all")
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const frameRef  = useRef(0)
   const nodesRef  = useRef<GraphNode[]>([])
@@ -81,7 +89,7 @@ export function EvidenceGraph({ evidence, onNodeClick }: Props) {
   const tickRef   = useRef(0)
   const mounted   = useRef(true)
 
-  const built = useMemo(() => buildGraph(evidence), [evidence])
+  const built = useMemo(() => buildGraph(caseId, evidence, filter), [caseId, evidence, filter])
 
   // Reinitialise nodes/edges whenever evidence changes
   useEffect(() => {
@@ -99,7 +107,7 @@ export function EvidenceGraph({ evidence, onNodeClick }: Props) {
       n.x  = safeN(n.x, cx)
       n.y  = safeN(n.y, cy)
 
-      if (n.id !== "__inv__") {
+      if (n.id !== caseId) {
         n.vx += (cx - n.x) * 0.0015
         n.vy += (cy - n.y) * 0.0015
       }
@@ -124,7 +132,7 @@ export function EvidenceGraph({ evidence, onNodeClick }: Props) {
             other.x = safeN(other.x, cx); other.y = safeN(other.y, cy)
             const dx = other.x - n.x, dy = other.y - n.y
             const d  = Math.sqrt(dx*dx + dy*dy) + 0.1
-            const tgt = n.id === "__inv__" ? 130 : 85
+            const tgt = n.id === caseId ? 130 : 85
             const f   = (d - tgt) / d * 0.04
             n.vx += dx * f; n.vy += dy * f
           }
@@ -134,7 +142,7 @@ export function EvidenceGraph({ evidence, onNodeClick }: Props) {
       n.x = Math.max(20, Math.min(W - 20, n.x + n.vx))
       n.y = Math.max(20, Math.min(H - 20, n.y + n.vy))
     }
-  }, [])
+  }, [caseId])
 
   useEffect(() => {
     mounted.current = true
@@ -196,7 +204,7 @@ export function EvidenceGraph({ evidence, onNodeClick }: Props) {
       for (const n of nodes) {
         const nx = safeN(n.x, cx), ny = safeN(n.y, cy)
         const col = TYPE_COLORS[n.type] ?? "#8B8D96"
-        const isCtr = n.id === "__inv__"
+        const isCtr = n.id === caseId
         const r = isCtr ? 16 : 7
 
         // Guard: only draw glow if coords are finite
@@ -226,7 +234,7 @@ export function EvidenceGraph({ evidence, onNodeClick }: Props) {
       ro.disconnect()
       document.removeEventListener("visibilitychange", handleVis)
     }
-  }, [simulate])
+  }, [caseId, simulate])
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onNodeClick) return
@@ -235,14 +243,26 @@ export function EvidenceGraph({ evidence, onNodeClick }: Props) {
     const mx = e.clientX - rect.left, my = e.clientY - rect.top
     for (const n of nodesRef.current) {
       const dx = safeN(n.x, 0) - mx, dy = safeN(n.y, 0) - my
-      if (Math.sqrt(dx*dx + dy*dy) < 18 && n.id !== "__inv__") {
+      if (Math.sqrt(dx*dx + dy*dy) < 18 && n.id !== caseId) {
         onNodeClick(n.id); break
       }
     }
-  }, [onNodeClick])
+  }, [caseId, onNodeClick])
 
   return (
     <div className="relative w-full h-full min-h-[220px]">
+      <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-1.5 max-w-[calc(100%-24px)]" aria-label="Graph filters">
+        {(["all", "transaction", "customer", "card", "device", "case"] as const).map(option => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setFilter(option)}
+            className={`forensic text-[8px] tracking-[.1em] uppercase px-2 py-1 border transition-colors ${filter === option ? "border-[var(--amber)]/55 bg-[var(--amber)]/10 text-[var(--amber-bright)]" : "border-white/10 bg-[var(--ink)]/65 text-white/35 hover:text-white/70"}`}
+          >
+            {option === "all" ? "ALL ENTITIES" : option}
+          </button>
+        ))}
+      </div>
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"

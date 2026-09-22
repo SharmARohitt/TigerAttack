@@ -4,18 +4,23 @@
 
 /* ── Design tokens ───────────────────────────────────────────────────── */
 :root {
-  --bg:          #0A0A0C;
-  --surface:     #14151A;
-  --surface-2:   #1C1E24;
-  --amber:       #D9A441;
-  --amber-dim:   #8A6B2E;
-  --cyan:        #4FD1E8;
-  --red-fx:      #E5484D;
-  --green-fx:    #3DD68C;
-  --yellow-fx:   #E8C547;
-  --text:        #F2F1ED;
-  --muted:       #8B8D96;
-  --border:      rgba(255,255,255,0.08);
+  --ink:         #050607;
+  --bg:          #080909;
+  --surface:     #0F1011;
+  --surface-2:   #151617;
+  --surface-3:   #1B1C1D;
+  --amber:       #F6A623;
+  --amber-bright:#FFB84A;
+  --amber-dim:   #8C5A18;
+  --ember:       #FF641F;
+  --cyan:        #62E6FF;
+  --red-fx:      #FF4D55;
+  --green-fx:    #7BE495;
+  --yellow-fx:   #F4D35E;
+  --text:        #F4F1EA;
+  --muted:       #A7A49D;
+  --quiet:       #686760;
+  --border:      rgba(255,255,255,0.09);
 }
 
 /* ── Base ────────────────────────────────────────────────────────────── */
@@ -24,7 +29,7 @@
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-geist), 'Helvetica Neue', sans-serif;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -40,8 +45,59 @@ html, body {
 
 /* ── Typography utilities ────────────────────────────────────────────── */
 .font-mono-ui {
-  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace;
+  font-family: var(--font-geist-mono), 'SFMono-Regular', Consolas, monospace;
 }
+
+.tiger-noise {
+  background-image:
+    radial-gradient(circle at 72% 8%, rgba(246,166,35,.08), transparent 34%),
+    linear-gradient(115deg, transparent 0 46%, rgba(246,166,35,.028) 46.1% 46.3%, transparent 46.4% 100%),
+    repeating-linear-gradient(125deg, rgba(255,255,255,.018) 0 1px, transparent 1px 15px);
+}
+
+.tiger-grid {
+  background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+.loader-beams {
+  position: absolute;
+  inset: -20%;
+  opacity: .5;
+  background: conic-gradient(from 220deg at 50% 48%, transparent 0 18%, rgba(98,230,255,.08) 19%, transparent 27% 46%, rgba(246,166,35,.12) 47%, transparent 58% 100%);
+  animation: loader-drift 16s linear infinite;
+}
+
+.loader-radar {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(72vw, 620px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(98,230,255,.09);
+  border-radius: 50%;
+  box-shadow: 0 0 0 48px rgba(98,230,255,.018), 0 0 0 96px rgba(246,166,35,.014), inset 0 0 80px rgba(98,230,255,.035);
+}
+
+.loader-radar::after {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border: 1px dashed rgba(246,166,35,.12);
+  border-radius: 50%;
+  animation: loader-spin 14s linear infinite reverse;
+}
+
+@keyframes loader-spin { to { transform: rotate(360deg); } }
+@keyframes loader-drift { to { transform: rotate(360deg); } }
+
+.eyebrow { letter-spacing: .24em; text-transform: uppercase; font-size: 10px; font-family: var(--font-geist-mono), monospace; }
+.forensic { font-family: var(--font-geist-mono), monospace; font-variant-numeric: tabular-nums; }
+.hairline { border-color: rgba(255,255,255,.09); }
+.status-live { color: var(--green-fx); text-shadow: 0 0 14px rgba(123,228,149,.35); }
+.status-live::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; }
 
 /* ── Surface helpers ─────────────────────────────────────────────────── */
 .surface   { background: var(--surface); }
@@ -55,8 +111,8 @@ html, body {
 }
 
 .glass-amber {
-  background: rgba(217,164,65,0.06);
-  border: 1px solid rgba(217,164,65,0.18);
+  background: rgba(246,166,35,0.07);
+  border: 1px solid rgba(246,166,35,0.22);
 }
 
 /* ── Amber glow ──────────────────────────────────────────────────────── */

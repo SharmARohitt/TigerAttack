@@ -122,6 +122,32 @@ class NextBestActions(BaseModel):
     what_changed: str = "nothing"
 
 
+class RecommendationSummary(BaseModel):
+    initial: list[ActionRecommendation] = Field(default_factory=list)
+    final: list[ActionRecommendation] = Field(default_factory=list)
+    changed: bool = False
+    change_reason: Optional[str] = None
+
+
+class EvidenceSummary(BaseModel):
+    items: list[EvidenceItem] = Field(default_factory=list)
+    item_count: int = 0
+    independent_signal_count: int = 0
+
+
+class ReasoningMetadata(BaseModel):
+    provider: str = ""
+    model: str = ""
+    executed: bool = False
+    fallback: bool = False
+    grounded: bool = False
+
+
+class MemoryMetadata(BaseModel):
+    write: dict[str, Any] = Field(default_factory=dict)
+    readback: dict[str, Any] = Field(default_factory=dict)
+
+
 class SAR(BaseModel):
     file: bool = False
     reason: str = ""
@@ -164,11 +190,13 @@ class CaseAnswer(BaseModel):
     stop_reason: str = ""
     tool_calls: int = 0
     llm_calls: int = 0
+    llm_backup_used: bool = False
     tokens: int = 0
     latency_s: float = 0.0
     runtime: dict[str, str] = Field(default_factory=dict)
     audit: list[dict[str, Any]] = Field(default_factory=list)
     validation: dict[str, Any] = Field(default_factory=dict)
+    grounding: dict[str, Any] = Field(default_factory=dict)
     case_memory: dict[str, Any] = Field(default_factory=dict)
     action_decisions: dict[str, dict[str, Any]] = Field(default_factory=dict)
     policy_evidence: list[dict[str, Any]] = Field(default_factory=list)
@@ -177,6 +205,13 @@ class CaseAnswer(BaseModel):
     initial_assessment: dict[str, Any] = Field(default_factory=dict)
     reassessment_history: list[dict[str, Any]] = Field(default_factory=list)
     explanation: dict[str, Any] = Field(default_factory=dict)
+    transaction: dict[str, Any] = Field(default_factory=dict)
+    customer: dict[str, Any] = Field(default_factory=dict)
+    card: dict[str, Any] = Field(default_factory=dict)
+    reasoning: ReasoningMetadata = Field(default_factory=ReasoningMetadata)
+    memory: MemoryMetadata = Field(default_factory=MemoryMetadata)
+    evidence_summary: EvidenceSummary = Field(default_factory=EvidenceSummary)
+    recommendation: RecommendationSummary = Field(default_factory=RecommendationSummary)
 
 
 # ── Internal investigation state (not in the answer file) ────────────────────

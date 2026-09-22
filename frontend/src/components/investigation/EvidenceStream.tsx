@@ -8,8 +8,8 @@ import type { EvidenceItem } from "@/lib/types"
 const SRC_STYLES: Record<string, string> = {
   graph:    "bg-[#4FD1E8]/10 border-[#4FD1E8]/30 text-[#4FD1E8]",
   document: "bg-white/05    border-white/15    text-[#8B8D96]",
-  customer: "bg-violet-500/10 border-violet-500/30 text-violet-300",
-  external: "bg-[#D9A441]/10 border-[#D9A441]/30 text-[#D9A441]",
+  customer: "bg-[#62E6FF]/10 border-[#62E6FF]/30 text-[#62E6FF]",
+  external: "bg-[#F6A623]/10 border-[#F6A623]/30 text-[#F6A623]",
 }
 
 interface Props {
@@ -102,9 +102,19 @@ export function EvidenceStream({ evidence, focusedEntityId }: Props) {
 
               {/* Expanded detail */}
               {isExpanded && (
-                <div className="px-3 pb-3 space-y-1.5 border-t border-white/06 pt-2">
+                <div className="px-3 pb-3 space-y-2 border-t border-white/06 pt-2">
                   <div className="font-mono-ui text-[9px] text-[#8B8D96]/50">
-                    REF: <span className="text-[#8B8D96]">{ev.ref || "—"}</span>
+                    QUERY / REF: <span className="text-[#8B8D96]">{ev.ref || "Not returned"}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="font-mono-ui text-[8px] text-[#8B8D96]/50">SOURCE TYPE</div>
+                      <div className="font-mono-ui text-[9px] text-[#F2F1ED]/70 mt-0.5">{ev.source}</div>
+                    </div>
+                    <div>
+                      <div className="font-mono-ui text-[8px] text-[#8B8D96]/50">RETRIEVED</div>
+                      <div className="font-mono-ui text-[9px] text-[#F2F1ED]/50 mt-0.5">Not returned</div>
+                    </div>
                   </div>
                   {ev.entity_ids.length > 0 && (
                     <div>
