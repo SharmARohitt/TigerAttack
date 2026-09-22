@@ -1,64 +1,101 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
+import { RefreshCw } from "lucide-react"
 import { listCases } from "@/lib/api"
+import { cn, formatUSD, statusColor, verdictColor, patternLabel } from "@/lib/utils"
 import type { CaseListItem } from "@/lib/types"
-import { formatCurrency, patternLabel, verdictColor, statusColor } from "@/lib/utils"
-import { cn } from "@/lib/utils"
 
-interface Props { onSelectCase: (caseId: string) => void; onBack: () => void }
+interface Props {
+  onSelectCase: (caseId: string) => void
+  onBack: () => void
+}
 
 export function CaseListView({ onSelectCase, onBack }: Props) {
   const [cases, setCases]     = useState<CaseListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(null)
     listCases(50)
       .then(c => { setCases(c); setLoading(false) })
-      .catch(e => { setError(e.message); setLoading(false) })
+      .catch(e => { setError(e instanceof Error ? e.message : "Unknown error"); setLoading(false) })
   }, [])
 
+  useEffect(() => { load() }, [load])
+
   return (
-    <div className="min-h-screen bg-[#080A0C] flex flex-col">
+    <div className="min-h-screen bg-[#0A0A0C] flex flex-col scanlines">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-white/08 shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="mono text-[10px] text-slate-600 hover:text-slate-400 transition-colors">
+          <button
+            onClick={onBack}
+            className="font-mono-ui text-[10px] text-[#8B8D96] hover:text-[#F2F1ED] transition-colors"
+            aria-label="Return to landing"
+          >
             ← TIGER EFFECT
           </button>
-          <div className="w-px h-4 bg-white/10" />
-          <span className="mono text-amber-400 text-sm tracking-wider">CASE EXPLORER</span>
+          <div className="w-px h-4 bg-white/10" aria-hidden />
+          <span className="font-mono-ui text-sm text-[#D9A441] tracking-wider">CASE EXPLORER</span>
         </div>
-        <span className="mono text-[10px] text-slate-600">{cases.length} CASES LOADED</span>
+        <div className="flex items-center gap-3">
+          <span className="font-mono-ui text-[10px] text-[#8B8D96]/50">
+            {loading ? "loading…" : `${cases.length} cases`}
+          </span>
+          <button
+            onClick={load}
+            aria-label="Refresh case list"
+            className="p-1.5 rounded hover:bg-white/05 text-[#8B8D96] transition-colors"
+          >
+            <RefreshCw size={12} />
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
+        {/* Loading */}
         {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="mono text-sm text-amber-500/60 animate-pulse">LOADING CASE MEMORY…</div>
+          <div className="space-y-2 animate-pulse">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-10 rounded bg-white/05" />
+            ))}
           </div>
         )}
 
-        {error && (
-          <div className="rounded border border-red-800/40 bg-red-950/20 p-4 text-red-400 mono text-sm">
-            CONNECTION LOST — {error}
+        {/* Error */}
+        {!loading && error && (
+          <div className="rounded-lg border border-[#E5484D]/40 bg-[#E5484D]/06 p-6 text-center">
+            <div className="font-mono-ui text-sm text-[#E5484D] mb-2">CONNECTION LOST</div>
+            <p className="font-mono-ui text-[10px] text-[#8B8D96] mb-4">{error}</p>
+            <button
+              onClick={load}
+              className="px-4 py-2 rounded border border-[#D9A441]/40 font-mono-ui text-xs text-[#D9A441] hover:bg-[#D9A441]/08 transition-colors"
+            >
+              RETRY
+            </button>
           </div>
         )}
 
+        {/* Empty */}
         {!loading && !error && cases.length === 0 && (
-          <div className="text-center py-20">
-            <div className="mono text-slate-600 mb-4">NO CASES IN MEMORY</div>
-            <p className="text-slate-700 text-sm">Run an investigation to populate case memory.</p>
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="font-mono-ui text-sm text-[#8B8D96]/40 mb-2">NO CASES IN MEMORY</div>
+            <p className="font-mono-ui text-[10px] text-[#8B8D96]/30">
+              Run an investigation to populate case memory.
+            </p>
           </div>
         )}
 
-        {!loading && cases.length > 0 && (
+        {/* Case list */}
+        {!loading && !error && cases.length > 0 && (
           <div className="space-y-2">
             {/* Column headers */}
-            <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-4 px-3 py-1.5">
-              {["CASE ID","STATUS","VERDICT","PATTERN","EXPOSURE",""].map(h => (
-                <span key={h} className="mono text-[8px] text-slate-700 tracking-wider">{h}</span>
+            <div className="grid grid-cols-[140px_100px_100px_80px_1fr_120px_40px] gap-3 px-3 py-1.5">
+              {["CASE ID","STATUS","VERDICT","PROB","PATTERN","EXPOSURE",""].map(h => (
+                <span key={h} className="font-mono-ui text-[8px] text-[#8B8D96]/40 uppercase tracking-wider">{h}</span>
               ))}
             </div>
 
@@ -66,35 +103,37 @@ export function CaseListView({ onSelectCase, onBack }: Props) {
               <motion.button
                 key={c.case_id}
                 onClick={() => onSelectCase(c.case_id)}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.03, 0.5) }}
-                className="w-full grid grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center
-                           px-3 py-3 rounded border border-white/5 bg-[#0D1117]/60
-                           hover:border-amber-700/30 hover:bg-[#111820]/80 text-left
-                           transition-all duration-150 group"
+                transition={{ delay: Math.min(i * 0.025, 0.5) }}
+                className="w-full grid grid-cols-[140px_100px_100px_80px_1fr_120px_40px] gap-3 items-center
+                           px-3 py-3 rounded-lg border border-white/08 bg-[#14151A]/50
+                           hover:border-[#D9A441]/30 hover:bg-[#14151A]/80
+                           text-left transition-all duration-150 group"
               >
-                <span className="mono text-sm text-amber-400 group-hover:text-amber-300 transition-colors">
+                <span className="font-mono-ui text-sm text-[#D9A441] group-hover:text-[#D9A441] transition-colors truncate">
                   {c.case_id}
                 </span>
-                <span className={cn("mono text-xs", statusColor(c.status))}>
-                  {c.status.replace(/_/g," ").toUpperCase()}
+                <span className={cn("font-mono-ui text-[10px] uppercase truncate", statusColor(c.status))}>
+                  {c.status.replace(/_/g, " ")}
                 </span>
-                <span className={cn("mono text-xs", verdictColor(c.verdict))}>
-                  {c.verdict.toUpperCase()}
+                <span className={cn("font-mono-ui text-[10px] uppercase", verdictColor(c.verdict))}>
+                  {c.verdict}
                 </span>
-                <span className="mono text-[10px] text-slate-500 truncate">
+                <span className="font-mono-ui text-[10px] text-[#F2F1ED]/70 tabular-nums">
+                  {c.fraud_probability != null ? c.fraud_probability.toFixed(3) : "—"}
+                </span>
+                <span className="font-mono-ui text-[9px] text-[#8B8D96]/60 truncate lowercase">
                   {patternLabel(c.pattern)}
                 </span>
-                <span className={cn("mono text-xs",
-                  c.exposure_usd > 1000 ? "text-red-400" :
-                  c.exposure_usd > 200  ? "text-amber-400" :
-                  "text-slate-400"
+                <span className={cn(
+                  "font-mono-ui text-[10px] tabular-nums",
+                  c.exposure_usd > 1000 ? "text-[#E5484D]" : c.exposure_usd > 200 ? "text-[#E8C547]" : "text-[#F2F1ED]/60",
                 )}>
-                  {formatCurrency(c.exposure_usd)}
+                  {formatUSD(c.exposure_usd)}
                 </span>
-                <span className="mono text-[9px] text-slate-700 group-hover:text-amber-600 transition-colors shrink-0">
-                  OPEN →
+                <span className="font-mono-ui text-[9px] text-[#8B8D96]/30 group-hover:text-[#D9A441]/60 transition-colors text-right">
+                  →
                 </span>
               </motion.button>
             ))}

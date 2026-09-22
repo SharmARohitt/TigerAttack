@@ -2,127 +2,145 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ───────────────────────────────────────────────────── */
 :root {
-  --amber:   #F59E0B;
-  --amber-dim: #92400E;
-  --cyan:    #06B6D4;
-  --red-fx:  #EF4444;
-  --green-fx:#10B981;
-  --bg:      #080A0C;
-  --surface: #0D1117;
-  --surface2:#111820;
-  --border:  rgba(255,255,255,0.06);
-  --text:    #E2E8F0;
-  --muted:   #64748B;
+  --bg:          #0A0A0C;
+  --surface:     #14151A;
+  --surface-2:   #1C1E24;
+  --amber:       #D9A441;
+  --amber-dim:   #8A6B2E;
+  --cyan:        #4FD1E8;
+  --red-fx:      #E5484D;
+  --green-fx:    #3DD68C;
+  --yellow-fx:   #E8C547;
+  --text:        #F2F1ED;
+  --muted:       #8B8D96;
+  --border:      rgba(255,255,255,0.08);
 }
 
-* { box-sizing: border-box; }
+/* ── Base ────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', 'IBM Plex Sans', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
-  scroll-behavior: smooth;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
 }
 
-/* Scrollbars */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.25); border-radius: 2px; }
+/* ── Scrollbars ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 3px; height: 3px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--amber-dim); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--amber); }
 
-/* Glass surface */
+/* ── Typography utilities ────────────────────────────────────────────── */
+.font-mono-ui {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace;
+}
+
+/* ── Surface helpers ─────────────────────────────────────────────────── */
+.surface   { background: var(--surface); }
+.surface-2 { background: var(--surface-2); }
+
 .glass {
-  background: rgba(255,255,255,0.03);
+  background: rgba(20,21,26,0.7);
   border: 1px solid var(--border);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .glass-amber {
-  background: rgba(245,158,11,0.05);
-  border: 1px solid rgba(245,158,11,0.15);
+  background: rgba(217,164,65,0.06);
+  border: 1px solid rgba(217,164,65,0.18);
 }
 
-/* Amber glow */
-.glow-amber { box-shadow: 0 0 20px rgba(245,158,11,0.15); }
-.glow-amber-strong { box-shadow: 0 0 40px rgba(245,158,11,0.3); }
+/* ── Amber glow ──────────────────────────────────────────────────────── */
+.glow-amber       { box-shadow: 0 0 18px rgba(217,164,65,0.18); }
+.glow-amber-lg    { box-shadow: 0 0 40px rgba(217,164,65,0.28); }
+.glow-amber-pulse { box-shadow: 0 0 24px rgba(217,164,65,0.35); }
 
-/* Scanline overlay */
-.scanlines::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.03) 2px,
-    rgba(0,0,0,0.03) 4px
-  );
-  pointer-events: none;
-  z-index: 9999;
+/* ── Focus ring ──────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
-/* Mono text */
-.mono { font-family: 'IBM Plex Mono', 'Fira Code', monospace; }
-
-/* Node pulse animation */
-@keyframes node-pulse {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50%       { opacity: 1;   transform: scale(1.15); }
+/* ── Stage pulse ─────────────────────────────────────────────────────── */
+@keyframes stage-pulse {
+  0%, 100% { opacity: 0.65; }
+  50%       { opacity: 1; }
 }
-.node-pulse { animation: node-pulse 2s ease-in-out infinite; }
+.stage-pulse {
+  animation: stage-pulse 1.6s ease-in-out infinite;
+}
 
-/* Amber scan line */
+/* ── Eye glow ────────────────────────────────────────────────────────── */
+@keyframes eye-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(217,164,65,0.4)); }
+  50%       { filter: drop-shadow(0 0 10px rgba(217,164,65,0.9)); }
+}
+.eye-glow { animation: eye-glow 1.8s ease-in-out infinite; }
+
+/* ── Scan line (cinematic overlay) ──────────────────────────────────── */
 @keyframes scan {
   from { transform: translateY(-100%); }
   to   { transform: translateY(100vh); }
 }
 .scan-line {
   position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+}
+.scan-line::after {
+  content: '';
+  position: absolute;
   left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,158,11,0.4), transparent);
-  animation: scan 4s linear infinite;
+  background: linear-gradient(90deg, transparent, rgba(217,164,65,0.35), transparent);
+  animation: scan 5s linear infinite;
+}
+
+/* ── Thin scanlines overlay ──────────────────────────────────────────── */
+.scanlines::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.025) 2px,
+    rgba(0,0,0,0.025) 4px
+  );
   pointer-events: none;
   z-index: 9998;
 }
 
-/* Particle drift */
-@keyframes drift {
-  from { transform: translateY(0) translateX(0); opacity: 0.4; }
-  50%  { opacity: 0.8; }
-  to   { transform: translateY(-60px) translateX(20px); opacity: 0; }
+/* ── Node ping ───────────────────────────────────────────────────────── */
+@keyframes node-ping {
+  0%    { transform: scale(1); opacity: 1; }
+  60%   { transform: scale(1.5); opacity: 0.4; }
+  100%  { transform: scale(1); opacity: 0; }
 }
+.node-ping { animation: node-ping 0.6s ease-out forwards; }
 
-/* Tiger eye glow */
-@keyframes eye-glow {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(245,158,11,0.4)); }
-  50%       { filter: drop-shadow(0 0 12px rgba(245,158,11,0.9)); }
-}
-.eye-glow { animation: eye-glow 1.8s ease-in-out infinite; }
-
-/* Graph edge draw */
-@keyframes edge-draw {
-  from { stroke-dashoffset: 1000; }
-  to   { stroke-dashoffset: 0; }
-}
-.edge-draw {
-  stroke-dasharray: 1000;
-  animation: edge-draw 1s ease forwards;
-}
-
-/* Status dot blink */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.3; }
-}
-.blink { animation: blink 1.6s ease-in-out infinite; }
-
-/* reduced-motion overrides */
+/* ── Reduced motion overrides ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  .scan-line::after { display: none; }
+}
+
+/* ── Tab hidden pause ────────────────────────────────────────────────── */
+.tab-hidden * {
+  animation-play-state: paused !important;
 }

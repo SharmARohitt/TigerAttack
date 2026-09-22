@@ -1,6 +1,12 @@
 // ── Exact types mirroring the backend Pydantic models ──────────────────────
 
-export type CaseStatus = "open" | "closed_fraud" | "closed_legitimate" | "escalated"
+export type CaseStatus =
+  | "open"
+  | "closed_fraud"
+  | "closed_legitimate"
+  | "escalated"
+  | "awaiting_external_evidence"
+
 export type Verdict = "fraud" | "legitimate" | "uncertain"
 export type FraudPattern =
   | "card_testing"
@@ -35,6 +41,8 @@ export interface EvidenceRequest {
   type: "customer_validation" | "step_up_auth" | "analyst_info"
   asked_after_step: number
   assumed_response: string
+  reason?: string
+  status?: string
 }
 
 export interface NextBestActions {
@@ -70,6 +78,11 @@ export interface CaseRecord {
   graph_case_id: string
 }
 
+// Runtime status values from validator — exact strings returned by backend
+export type RuntimeValue =
+  | "CONNECTED" | "DEGRADED" | "AVAILABLE" | "FAILED"
+  | "NOT_AVAILABLE" | "DISABLED" | "UNKNOWN"
+
 export interface CaseAnswer {
   case_id: string
   case: CaseRecord
@@ -81,6 +94,63 @@ export interface CaseAnswer {
   tokens: number
   latency_s: number
   audit?: AuditEntry[]
+  // Runtime fields from validate_backend.py _case_metrics()
+  runtime?: {
+    tigergraph?: RuntimeValue
+    mcp?: RuntimeValue
+    llm?: RuntimeValue
+    graphrag?: RuntimeValue
+  }
+  grounding?: {
+    llm_provider?: string
+    llm_model?: string
+    llm_runtime?: RuntimeValue
+    llm_fallback_used?: boolean
+    llm_backup_used?: boolean
+    llm_api_calls?: number
+    llm_error?: string
+    fabricated_entities?: number
+    unsupported_claims?: number
+    case_memory_readback?: boolean
+    llm_context_source?: string
+  }
+  llm_api_calls?: number
+  llm_backup_used?: boolean
+  case_memory?: {
+    written?: boolean
+    graph_case_id?: string
+    readback?: boolean
+  }
+  policy_evidence?: PolicyEvidenceItem[]
+  typology_evidence?: PolicyEvidenceItem[]
+  reassessment_history?: ReassessmentEntry[]
+  initial_assessment?: Record<string, unknown>
+  action_decisions?: Record<string, { status: string; execution_mode?: string }>
+}
+
+export interface PolicyEvidenceItem {
+  rule_id?: string
+  doc_id?: string
+  title?: string
+  text?: string
+  triggers?: string[]
+  actions?: string[]
+  fraud_types?: string[]
+  typology_id?: string
+  name?: string
+  description?: string
+  indicators?: string[]
+  policy_rules?: string[]
+}
+
+export interface ReassessmentEntry {
+  stage?: string
+  request_id?: string
+  risk_before?: number
+  risk_after?: number
+  action_before?: string[]
+  action_after?: string[]
+  change_summary?: string
 }
 
 export interface CaseListItem {
@@ -120,18 +190,40 @@ export interface StreamEvent {
   answer?: CaseAnswer
 }
 
-// ── Graph node/edge for vis ─────────────────────────────────────────────────
+// ── Graph node/edge for d3-force vis ────────────────────────────────────────
 export interface GraphNode {
   id: string
   label: string
   type: "transaction" | "card" | "customer" | "device" | "case" | "policy" | "evidence"
   value?: string | number
   highlighted?: boolean
+  // d3-force simulation fields (assigned at runtime)
+  x?: number
+  y?: number
+  vx?: number
+  vy?: number
+  fx?: number | null
+  fy?: number | null
 }
 
 export interface GraphEdge {
-  source: string
-  target: string
+  source: string | GraphNode
+  target: string | GraphNode
   label?: string
   strength?: number
 }
+
+// ── State machine ────────────────────────────────────────────────────────────
+export type Screen = "landing" | "transition" | "workspace" | "list"
+
+export type InvestigationStage =
+  | "TRIGGER"
+  | "INVESTIGATE"
+  | "GATHER EVIDENCE"
+  | "ASSESS UNCERTAINTY"
+  | "GATHER MORE EVIDENCE"
+  | "TAKE ACTION"
+  | "EXPLAIN"
+  | "REMEMBER"
+
+export type StageState = "completed" | "current" | "pending"

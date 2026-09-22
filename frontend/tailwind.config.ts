@@ -9,18 +9,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        amber: {
-          950: "#1a0e00",
-        },
-        bg: "#080A0C",
-        surface: "#0D1117",
+        bg:        "#0A0A0C",
+        surface:   "#14151A",
+        surface2:  "#1C1E24",
+        amber:     { DEFAULT: "#D9A441", dim: "#8A6B2E" },
+        cyan:      { fx: "#4FD1E8" },
+        red:       { fx: "#E5484D" },
+        green:     { fx: "#3DD68C" },
+        yellow:    { fx: "#E8C547" },
+        text:      { primary: "#F2F1ED", muted: "#8B8D96" },
       },
       fontFamily: {
-        sans: ["Inter", "IBM Plex Sans", "system-ui", "sans-serif"],
-        mono: ["IBM Plex Mono", "Fira Code", "monospace"],
+        sans: ["Inter", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "IBM Plex Mono", "Fira Code", "monospace"],
       },
-      animation: {
-        "pulse-slow": "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+      borderColor: {
+        DEFAULT: "rgba(255,255,255,0.08)",
       },
     },
   },

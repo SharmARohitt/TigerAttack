@@ -1,31 +1,32 @@
 "use client"
-import { useState } from "react"
-import { motion } from "framer-motion"
-import type { CaseAnswer, AuditEntry } from "@/lib/types"
-import { formatCurrency, formatProbability, patternLabel } from "@/lib/utils"
+import { useState, useCallback } from "react"
+import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { VerdictBadge } from "@/components/ui/VerdictBadge"
-import { GlassPanel } from "@/components/ui/GlassPanel"
-import { InvestigationPhases } from "./InvestigationPhases"
+import { RuntimePill } from "@/components/ui/RuntimePill"
+import { StateMachineStrip } from "./StateMachineStrip"
+import { CaseHeader } from "./CaseHeader"
+import { CaseMemoryPanel } from "./CaseMemoryPanel"
 import { EvidenceGraph } from "./EvidenceGraph"
 import { EvidenceStream } from "./EvidenceStream"
-import { ActionCenter } from "./ActionCenter"
-import { PolicyView } from "./PolicyView"
-import { HistoricalCases } from "./HistoricalCases"
-import { CaseMemoryPanel } from "./CaseMemoryPanel"
-import { AuditTimeline } from "./AuditTimeline"
+import { ReasoningTab } from "./ReasoningTab"
+import { PolicyTab } from "./PolicyTab"
+import { HistoryTab } from "./HistoryTab"
+import { AuditTab } from "./AuditTab"
 import { SARPanel } from "./SARPanel"
+import { ActionCenter } from "./ActionCenter"
+import type { CaseAnswer, AuditEntry } from "@/lib/types"
 
 const TABS = [
-  { id: "graph",   label: "GRAPH" },
-  { id: "evidence",label: "EVIDENCE" },
-  { id: "actions", label: "ACTIONS" },
-  { id: "policy",  label: "POLICY" },
-  { id: "history", label: "HISTORY" },
-  { id: "memory",  label: "MEMORY" },
-  { id: "sar",     label: "SAR" },
-  { id: "audit",   label: "AUDIT" },
-]
+  { id: "reasoning", label: "REASONING" },
+  { id: "evidence",  label: "EVIDENCE" },
+  { id: "policy",    label: "POLICY" },
+  { id: "history",   label: "HISTORY" },
+  { id: "audit",     label: "AUDIT" },
+  { id: "sar",       label: "SAR" },
+  { id: "actions",   label: "ACTIONS" },
+] as const
+
+type TabId = typeof TABS[number]["id"]
 
 interface Props {
   answer: CaseAnswer
@@ -34,111 +35,99 @@ interface Props {
   onBack: () => void
 }
 
-export function InvestigationWorkspace({ answer, audit, streaming, onBack }: Props) {
-  const [tab, setTab] = useState<string>("graph")
-  const { case: c } = answer
+export function InvestigationWorkspace({ answer, audit, onBack }: Props) {
+  const [activeTab, setActiveTab]         = useState<TabId>("reasoning")
+  const [drawerOpen, setDrawerOpen]       = useState(true)
+  const [focusedEntity, setFocusedEntity] = useState<string | null>(null)
 
-  const riskColor =
-    c.fraud_probability >= 0.8 ? "text-red-400" :
-    c.fraud_probability >= 0.5 ? "text-amber-400" :
-    "text-emerald-400"
+  const c  = answer.case
+  const rt = answer.runtime ?? {}
+
+  const handleNodeClick = useCallback((nodeId: string) => {
+    setFocusedEntity(nodeId)
+    setActiveTab("evidence")
+  }, [])
+
+  const statusCls =
+    c.status.includes("fraud") || c.status.includes("escalated")
+      ? "border-[#E5484D]/30 bg-[#E5484D]/08 text-[#E5484D]"
+      : c.status.includes("legitimate")
+        ? "border-[#3DD68C]/30 bg-[#3DD68C]/08 text-[#3DD68C]"
+        : "border-[#E8C547]/30 bg-[#E8C547]/08 text-[#E8C547]"
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className="min-h-screen flex flex-col bg-[#080A0C]"
+    <div
+      className="flex flex-col bg-[#0A0A0C] scanlines"
+      style={{ height: "100dvh", overflow: "hidden" }}
     >
-      {/* ── Top bar ───────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 shrink-0">
-        <div className="flex items-center gap-3">
+      {/* ── TOP BAR ──────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-4 border-b border-white/08 shrink-0"
+              style={{ height: 48 }}>
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBack}
-            className="mono text-[10px] text-slate-600 hover:text-slate-400 transition-colors flex items-center gap-1"
+            className="font-mono-ui text-[10px] text-[#8B8D96] hover:text-[#F2F1ED] transition-colors flex items-center gap-1 shrink-0"
+            aria-label="Return to landing"
           >
-            ← TIGER EFFECT
+            ← <span className="hidden sm:inline">TIGER EFFECT</span>
           </button>
-          <div className="w-px h-4 bg-white/10" />
-          <span className="mono text-amber-400 text-sm font-semibold tracking-wider">{answer.case_id}</span>
-          <VerdictBadge verdict={c.verdict} probability={c.fraud_probability} />
+          <div className="w-px h-4 bg-white/10 shrink-0" aria-hidden />
+          <span className="font-mono-ui text-sm text-[#D9A441] font-semibold tracking-wider shrink-0">
+            {answer.case_id}
+          </span>
+          <span className={cn(
+            "font-mono-ui text-[9px] px-2 py-0.5 rounded border uppercase tracking-wider shrink-0 hidden sm:inline-flex",
+            statusCls,
+          )}>
+            {c.status}
+          </span>
         </div>
-
-        <div className="flex items-center gap-4 text-[10px] mono">
-          <span className="text-slate-600">
-            TOOL CALLS <span className="text-slate-400">{answer.tool_calls}</span>
-          </span>
-          <span className="text-slate-600">
-            LATENCY <span className="text-slate-400">{answer.latency_s.toFixed(2)}s</span>
-          </span>
-          <span className="text-slate-600">
-            EVIDENCE <span className="text-slate-400">{c.evidence.length}</span>
-          </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {rt.tigergraph && <RuntimePill label="TG"  value={rt.tigergraph} />}
+          {rt.mcp        && <RuntimePill label="MCP" value={rt.mcp} />}
+          {rt.llm        && <RuntimePill label="LLM" value={rt.llm} />}
+          <button onClick={onBack} aria-label="Back" className="ml-1 p-1.5 rounded hover:bg-white/05 text-[#8B8D96]">
+            <RefreshCw size={12} />
+          </button>
         </div>
       </header>
 
-      {/* ── Case header ───────────────────────────────────────────────── */}
-      <div className="px-4 py-3 border-b border-white/5 bg-[#0D1117]/60 shrink-0">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          {/* Key metrics row */}
-          <div className="flex items-center gap-1">
-            <span className="mono text-[9px] text-slate-600">RISK</span>
-            <span className={cn("mono text-sm font-bold", riskColor)}>
-              {formatProbability(c.fraud_probability)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="mono text-[9px] text-slate-600">EXPOSURE</span>
-            <span className="mono text-sm text-slate-200">{formatCurrency(c.exposure_usd)}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="mono text-[9px] text-slate-600">PATTERN</span>
-            <span className="mono text-xs text-cyan-400">{patternLabel(c.pattern)}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="mono text-[9px] text-slate-600">TXN</span>
-            <span className="mono text-xs text-slate-300">{c.affected_txn_ids[0] ?? "—"}</span>
-          </div>
-          {c.connected_card_ids.length > 0 && (
-            <div className="flex items-center gap-1">
-              <span className="mono text-[9px] text-slate-600">CONNECTED CARDS</span>
-              <span className="mono text-xs text-slate-400">{c.connected_card_ids.length}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Investigation phases */}
-        <div className="mt-3 overflow-x-auto">
-          <InvestigationPhases status={c.status} verdict={c.verdict} />
-        </div>
+      {/* ── STATE MACHINE STRIP ──────────────────────────────────── */}
+      <div className="px-4 py-2 border-b border-white/08 bg-[#14151A]/40 shrink-0 overflow-x-auto">
+        <StateMachineStrip answer={answer} />
       </div>
 
-      {/* ── Main layout ───────────────────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* ── MAIN BODY (flex row, fills remaining height) ─────────── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* LEFT — Evidence stream */}
-        <div className="w-72 xl:w-80 border-r border-white/5 flex flex-col shrink-0">
-          <div className="px-3 py-2 border-b border-white/5">
-            <span className="mono text-[9px] tracking-[0.3em] text-slate-600">EVIDENCE STREAM</span>
+        {/* LEFT: case header — hidden on mobile */}
+        <aside className="hidden md:flex flex-col w-56 xl:w-64 border-r border-white/08 overflow-y-auto shrink-0">
+          <CaseHeader answer={answer} />
+          <div className="px-4 pb-4">
+            <CaseMemoryPanel answer={answer} />
           </div>
-          <div className="flex-1 overflow-hidden p-2">
-            <EvidenceStream evidence={c.evidence} streaming={streaming} />
+        </aside>
+
+        {/* CENTER: graph */}
+        <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
+          <div className="flex-1 relative min-h-[180px]">
+            <EvidenceGraph evidence={c.evidence} onNodeClick={handleNodeClick} />
           </div>
         </div>
 
-        {/* CENTER — Tabbed workspace */}
-        <div className="flex-1 flex flex-col min-w-0">
+        {/* RIGHT: tabs — always visible on lg+, slide-over on smaller */}
+        <div className="flex flex-col border-l border-white/08 shrink-0 w-72 xl:w-80 overflow-hidden">
           {/* Tab bar */}
-          <div className="flex items-center gap-0 border-b border-white/5 px-2 shrink-0 overflow-x-auto">
+          <div className="flex items-center gap-0 border-b border-white/08 px-1 shrink-0 overflow-x-auto bg-[#14151A]/80">
             {TABS.map(t => (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => setActiveTab(t.id)}
                 className={cn(
-                  "px-3 py-2.5 mono text-[10px] tracking-wider shrink-0 border-b-2 transition-colors duration-150",
-                  tab === t.id
-                    ? "border-amber-500 text-amber-400"
-                    : "border-transparent text-slate-600 hover:text-slate-400"
+                  "px-2.5 py-2.5 font-mono-ui text-[9px] tracking-wider shrink-0 border-b-2 transition-colors whitespace-nowrap",
+                  activeTab === t.id
+                    ? "border-[#D9A441] text-[#D9A441]"
+                    : "border-transparent text-[#8B8D96] hover:text-[#F2F1ED]",
                 )}
               >
                 {t.label}
@@ -146,187 +135,61 @@ export function InvestigationWorkspace({ answer, audit, streaming, onBack }: Pro
             ))}
           </div>
 
-          {/* Tab content */}
-          <div className="flex-1 overflow-auto p-4">
-            {tab === "graph" && (
-              <div className="h-full min-h-[360px]">
-                <EvidenceGraph evidence={c.evidence} caseId={answer.case_id} />
-              </div>
-            )}
-
-            {tab === "evidence" && (
-              <div className="space-y-2 max-w-3xl">
-                <div className="mono text-[9px] tracking-[0.3em] text-slate-600 mb-3">
-                  EVIDENCE PACK — {c.evidence.length} ITEMS
-                </div>
-                {c.evidence.map((ev, i) => (
-                  <GlassPanel key={i} className="p-3">
-                    <div className="flex items-start gap-3">
-                      <div className="shrink-0 mt-0.5">
-                        <span className={cn("mono text-[9px] px-1.5 py-0.5 rounded border uppercase",
-                          ev.source === "graph"    ? "border-cyan-800/50 text-cyan-500 bg-cyan-950/20" :
-                          ev.source === "customer" ? "border-violet-800/50 text-violet-500 bg-violet-950/20" :
-                          "border-slate-700/50 text-slate-500 bg-slate-900/30"
-                        )}>
-                          {ev.source}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-slate-300 text-xs leading-snug mb-1.5">{ev.claim}</p>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                          <span className="mono text-[8px] text-slate-600">
-                            REF: <span className="text-slate-500">{ev.ref}</span>
-                          </span>
-                          {ev.entity_ids.length > 0 && (
-                            <span className="mono text-[8px] text-slate-600">
-                              ENTITIES: <span className="text-cyan-700">{ev.entity_ids.join(" → ")}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </GlassPanel>
-                ))}
-              </div>
-            )}
-
-            {tab === "actions" && (
-              <div className="max-w-xl space-y-6">
-                <ActionCenter
-                  actions={answer.next_best_actions.initial}
-                  caseId={answer.case_id}
-                  label="INITIAL RECOMMENDATION"
-                />
-                {answer.next_best_actions.what_changed !== "nothing" && (
-                  <div className="rounded border border-amber-800/30 bg-amber-950/10 p-3">
-                    <div className="mono text-[9px] text-amber-600 mb-1">WHAT CHANGED</div>
-                    <p className="text-slate-400 text-[10px]">{answer.next_best_actions.what_changed}</p>
-                  </div>
-                )}
-                <ActionCenter
-                  actions={answer.next_best_actions.final}
-                  caseId={answer.case_id}
-                  label="FINAL RECOMMENDATION"
-                />
-                {answer.evidence_requests.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="mono text-[9px] tracking-[0.3em] text-slate-600">EVIDENCE REQUESTED</h3>
-                    {answer.evidence_requests.map((er, i) => (
-                      <GlassPanel key={i} className="p-3">
-                        <div className="mono text-[9px] text-amber-500 mb-1 uppercase">{er.type.replace(/_/g," ")}</div>
-                        <p className="text-slate-400 text-[10px]">{er.assumed_response}</p>
-                      </GlassPanel>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {tab === "policy" && (
-              <div className="max-w-xl">
-                <PolicyView
-                  actions={answer.next_best_actions.final}
-                  stopReason={answer.stop_reason}
-                />
-              </div>
-            )}
-
-            {tab === "history" && (
-              <div className="max-w-xl">
-                <HistoricalCases
-                  caseIds={c.similar_prior_cases}
-                  currentCaseId={answer.case_id}
-                />
-              </div>
-            )}
-
-            {tab === "memory" && (
-              <div className="max-w-xl">
-                <CaseMemoryPanel answer={answer} />
-              </div>
-            )}
-
-            {tab === "sar" && (
-              <div className="max-w-xl">
-                <SARPanel sar={answer.sar} />
-              </div>
-            )}
-
-            {tab === "audit" && (
-              <div className="max-w-xl">
-                <AuditTimeline entries={audit} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* RIGHT — Verdict + summary panel */}
-        <div className="w-64 xl:w-72 border-l border-white/5 flex flex-col shrink-0">
-          <div className="px-3 py-2 border-b border-white/5">
-            <span className="mono text-[9px] tracking-[0.3em] text-slate-600">INVESTIGATION INTELLIGENCE</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
-
-            {/* Verdict */}
-            <GlassPanel amber={c.verdict === "fraud"} glow={c.verdict === "fraud"} className="p-3">
-              <div className="mono text-[8px] text-slate-600 mb-2">VERDICT</div>
-              <VerdictBadge verdict={c.verdict} probability={c.fraud_probability} className="w-full justify-center mb-2" />
-              <div className="mono text-[9px] text-slate-600 text-center">
-                {c.status.replace(/_/g, " ").toUpperCase()}
-              </div>
-            </GlassPanel>
-
-            {/* Pattern */}
-            <GlassPanel className="p-3">
-              <div className="mono text-[8px] text-slate-600 mb-1">FRAUD PATTERN</div>
-              <div className="mono text-xs text-cyan-400">{patternLabel(c.pattern)}</div>
-              {c.pattern_description && (
-                <p className="text-slate-500 text-[9px] mt-1 leading-relaxed">{c.pattern_description}</p>
-              )}
-            </GlassPanel>
-
-            {/* Exposure */}
-            <GlassPanel className="p-3">
-              <div className="mono text-[8px] text-slate-600 mb-1">FINANCIAL EXPOSURE</div>
-              <div className={cn("mono text-lg font-bold",
-                c.exposure_usd > 1000 ? "text-red-400" :
-                c.exposure_usd > 200  ? "text-amber-400" :
-                "text-slate-300"
-              )}>
-                {formatCurrency(c.exposure_usd)}
-              </div>
-              <div className="mono text-[9px] text-slate-600 mt-0.5">
-                {c.affected_txn_ids.length} transaction(s) affected
-              </div>
-            </GlassPanel>
-
-            {/* Stop reason */}
-            <GlassPanel className="p-3">
-              <div className="mono text-[8px] text-slate-600 mb-1">STOP REASON</div>
-              <p className="text-slate-500 text-[9px] leading-relaxed">{answer.stop_reason}</p>
-            </GlassPanel>
-
-            {/* Summary */}
-            {c.summary && (
-              <GlassPanel className="p-3">
-                <div className="mono text-[8px] text-slate-600 mb-1">SUMMARY</div>
-                <p className="text-slate-500 text-[9px] leading-relaxed">{c.summary}</p>
-              </GlassPanel>
-            )}
-
-            {/* Graph status */}
-            <GlassPanel className="p-3">
-              <div className="mono text-[8px] text-slate-600 mb-1">GRAPH STATUS</div>
-              <div className="flex items-center gap-1.5">
-                <div className={cn("w-1.5 h-1.5 rounded-full", c.written_to_graph ? "bg-emerald-500" : "bg-slate-700")} />
-                <span className="mono text-[9px] text-slate-400">
-                  {c.written_to_graph ? "WRITTEN TO TIGERGRAPH" : "NOT YET WRITTEN"}
-                </span>
-              </div>
-            </GlassPanel>
+          {/* Tab content — scrollable */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            {activeTab === "evidence"  && <EvidenceStream evidence={c.evidence} focusedEntityId={focusedEntity} />}
+            {activeTab === "reasoning" && <ReasoningTab answer={answer} />}
+            {activeTab === "policy"    && <PolicyTab answer={answer} />}
+            {activeTab === "history"   && <HistoryTab answer={answer} />}
+            {activeTab === "audit"     && <AuditTab entries={audit} />}
+            {activeTab === "sar"       && <SARPanel sar={answer.sar} />}
+            {activeTab === "actions"   && <ActionCenter answer={answer} />}
           </div>
         </div>
       </div>
-    </motion.div>
+
+      {/* ── BOTTOM DRAWER ────────────────────────────────────────── */}
+      <div
+        className="border-t border-white/08 shrink-0 bg-[#14151A]/60 transition-all duration-250"
+        style={{ height: drawerOpen ? 180 : 36 }}
+      >
+        <button
+          onClick={() => setDrawerOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-2 hover:bg-white/03 transition-colors"
+          aria-expanded={drawerOpen}
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-mono-ui text-[9px] text-[#8B8D96]/60 uppercase tracking-wider">
+              EVIDENCE STREAM
+            </span>
+            <span className="font-mono-ui text-[8px] text-[#8B8D96]/35">
+              {c.evidence.length} items
+            </span>
+          </div>
+          {drawerOpen
+            ? <ChevronDown size={11} className="text-[#8B8D96]/40" aria-hidden />
+            : <ChevronRight size={11} className="text-[#8B8D96]/40 rotate-90" aria-hidden />}
+        </button>
+
+        {drawerOpen && (
+          <div className="overflow-y-auto px-2" style={{ height: 144 }}>
+            <EvidenceStream evidence={c.evidence} focusedEntityId={focusedEntity} />
+          </div>
+        )}
+      </div>
+
+      {/* Mobile: accordion for case details */}
+      <div className="md:hidden border-t border-white/08 shrink-0 bg-[#14151A]/60">
+        <details>
+          <summary className="flex items-center justify-between px-4 py-2 font-mono-ui text-[9px] text-[#8B8D96]/60 uppercase tracking-wider cursor-pointer list-none">
+            <span>CASE DETAILS</span>
+            <ChevronDown size={11} className="text-[#8B8D96]/40" />
+          </summary>
+          <div className="max-h-56 overflow-y-auto border-t border-white/08">
+            <CaseHeader answer={answer} />
+          </div>
+        </details>
+      </div>
+    </div>
   )
 }

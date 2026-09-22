@@ -9,6 +9,16 @@ import type { CaseAnswer, AuditEntry } from "@/lib/types"
 
 type Screen = "hero" | "list" | "investigating" | "workspace"
 
+const HUNT_STEPS = [
+  "AWAKENING TIGER",
+  "MAPPING TRANSACTION",
+  "TRACING CONNECTIONS",
+  "SEARCHING CASE MEMORY",
+  "CHECKING POLICY",
+  "ASSESSING EVIDENCE",
+  "UPDATING CASE MEMORY",
+]
+
 export default function Home() {
   const [screen, setScreen]       = useState<Screen>("hero")
   const [answer, setAnswer]       = useState<CaseAnswer | null>(null)
@@ -22,46 +32,32 @@ export default function Home() {
     setLoading("AWAKENING TIGER")
     setScreen("investigating")
 
-    const STEPS = [
-      "MAPPING TRANSACTION",
-      "TRACING CONNECTIONS",
-      "SEARCHING CASE MEMORY",
-      "CHECKING POLICY",
-      "ASSESSING EVIDENCE",
-    ]
+    // Rotate through hunt steps while the backend call runs
+    let stepIdx = 0
+    const stepTimer = setInterval(() => {
+      stepIdx = (stepIdx + 1) % HUNT_STEPS.length
+      setLoading(HUNT_STEPS[stepIdx])
+    }, 550)
 
-    // Try to load existing case first (fast path)
     try {
-      setLoading("MAPPING TRANSACTION")
-      const existing = await getCase(caseId)
-      setLoading("SEARCHING CASE MEMORY")
+      // Try fast path: case already exists
+      let result: CaseAnswer | null = null
+      try {
+        result = await getCase(caseId)
+        setStreaming(false)
+      } catch {
+        // Not found — run investigation
+        setStreaming(true)
+        result = await runInvestigation(caseId)
+      }
+
       const auditData = await getCaseAudit(caseId).catch(() => ({ audit: [] }))
-      setAnswer(existing)
-      setAudit((auditData.audit ?? []) as AuditEntry[])
-      setStreaming(false)
-      setScreen("workspace")
-      return
-    } catch {
-      // Case not found — run investigation
-    }
-
-    // Run investigation with step feedback
-    try {
-      let stepIdx = 0
-      const stepTimer = setInterval(() => {
-        stepIdx = (stepIdx + 1) % STEPS.length
-        setLoading(STEPS[stepIdx])
-      }, 600)
-
-      setStreaming(true)
-      const result = await runInvestigation(caseId)
       clearInterval(stepTimer)
-
-      const auditData = await getCaseAudit(caseId).catch(() => ({ audit: [] }))
       setAnswer(result)
       setAudit((auditData.audit ?? []) as AuditEntry[])
       setScreen("workspace")
     } catch (e: unknown) {
+      clearInterval(stepTimer)
       const msg = e instanceof Error ? e.message : "Unknown error"
       setError(msg)
       setScreen("hero")
@@ -82,19 +78,38 @@ export default function Home() {
     <main>
       <AnimatePresence mode="wait">
 
+        {/* LANDING */}
         {screen === "hero" && (
-          <motion.div key="hero" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="hero"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.35 }}
+          >
             <HeroSection onLaunch={handleHeroLaunch} />
             {error && (
-              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded border border-red-700/50 bg-red-950/80 backdrop-blur px-6 py-3 mono text-sm text-red-300">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-[#E5484D]/40 bg-[#E5484D]/12 backdrop-blur px-5 py-3 font-mono-ui text-sm text-[#E5484D] shadow-2xl max-w-md text-center"
+                role="alert"
+              >
                 {error}
-              </div>
+              </motion.div>
             )}
           </motion.div>
         )}
 
+        {/* CASE LIST */}
         {screen === "list" && (
-          <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+          <motion.div
+            key="list"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
             <CaseListView
               onSelectCase={loadCase}
               onBack={() => setScreen("hero")}
@@ -102,50 +117,98 @@ export default function Home() {
           </motion.div>
         )}
 
+        {/* TRANSITION / INVESTIGATING */}
         {screen === "investigating" && (
           <motion.div
             key="investigating"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-[#080A0C] flex flex-col items-center justify-center gap-6"
+            exit={{ opacity: 0, scale: 1.04 }}
+            transition={{ duration: 0.4 }}
+            className="fixed inset-0 bg-[#0A0A0C] flex flex-col items-center justify-center gap-7"
           >
-            {/* Animated tiger eye */}
+            {/* Tiger eye animation */}
             <motion.div
-              className="w-20 h-20 rounded-full border border-amber-500/30 bg-amber-950/20 flex items-center justify-center"
-              animate={{ scale: [1, 1.08, 1], boxShadow: ["0 0 20px rgba(245,158,11,0.1)", "0 0 50px rgba(245,158,11,0.35)", "0 0 20px rgba(245,158,11,0.1)"] }}
-              transition={{ duration: 1.6, repeat: Infinity }}
+              className="w-24 h-24 rounded-full border border-[#D9A441]/25 bg-[#D9A441]/06 flex items-center justify-center"
+              animate={{
+                scale: [1, 1.07, 1],
+                boxShadow: [
+                  "0 0 20px rgba(217,164,65,0.08)",
+                  "0 0 55px rgba(217,164,65,0.30)",
+                  "0 0 20px rgba(217,164,65,0.08)",
+                ],
+              }}
+              transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
             >
-              <span className="text-3xl eye-glow">⟁</span>
+              <motion.span
+                className="text-4xl"
+                style={{ filter: "drop-shadow(0 0 8px rgba(217,164,65,0.7))" }}
+                animate={{ opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 1.7, repeat: Infinity }}
+                aria-hidden
+              >
+                ⟁
+              </motion.span>
             </motion.div>
 
-            <div className="text-center">
-              <motion.div
-                key={loadingMsg}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="mono text-amber-400 text-sm tracking-[0.3em] mb-2"
-              >
-                {loadingMsg || "INITIALISING…"}
-              </motion.div>
-              <div className="mono text-slate-700 text-xs">TIGER EFFECT — INVESTIGATION IN PROGRESS</div>
+            {/* Step label */}
+            <div className="text-center space-y-2">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={loadingMsg}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                  className="font-mono-ui text-sm text-[#D9A441] tracking-[0.28em] uppercase"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {loadingMsg || "INITIALISING…"}
+                </motion.div>
+              </AnimatePresence>
+              <div className="font-mono-ui text-[10px] text-[#8B8D96]/40 tracking-widest uppercase">
+                TIGER EFFECT — INVESTIGATION IN PROGRESS
+              </div>
             </div>
 
             {/* Progress bar */}
-            <div className="w-64 h-px bg-slate-900 rounded overflow-hidden">
+            <div className="w-72 h-px bg-[#14151A] rounded overflow-hidden" aria-hidden>
               <motion.div
-                className="h-full bg-amber-500/60"
+                className="h-full bg-gradient-to-r from-[#D9A441]/60 to-[#D9A441]"
                 initial={{ width: "0%" }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 4, ease: "linear" }}
+                animate={{ width: "92%" }}
+                transition={{ duration: 5.5, ease: "easeInOut" }}
               />
+            </div>
+
+            {/* Graph node pulse — decorative hint */}
+            <div className="flex gap-3 mt-1" aria-hidden>
+              {[0, 1, 2, 3, 4].map(i => (
+                <motion.div
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full bg-[#4FD1E8]/40"
+                  animate={{ opacity: [0.2, 0.9, 0.2], scale: [0.8, 1.2, 0.8] }}
+                  transition={{
+                    duration: 1.2,
+                    repeat: Infinity,
+                    delay: i * 0.18,
+                  }}
+                />
+              ))}
             </div>
           </motion.div>
         )}
 
+        {/* WORKSPACE */}
         {screen === "workspace" && answer && (
-          <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="workspace"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
             <InvestigationWorkspace
               answer={answer}
               audit={audit}

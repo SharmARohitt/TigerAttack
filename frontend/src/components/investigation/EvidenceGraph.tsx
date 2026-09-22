@@ -1,217 +1,260 @@
 "use client"
-import { useEffect, useRef, useMemo } from "react"
-import type { EvidenceItem } from "@/lib/types"
-
-interface Node { id: string; label: string; type: string; x: number; y: number; vx: number; vy: number }
-interface Edge { s: string; t: string }
+/**
+ * d3-force evidence graph.
+ * Nodes/edges built ONLY from the backend evidence array — no fabrication.
+ */
+import { useEffect, useRef, useMemo, useCallback } from "react"
+import type { EvidenceItem, GraphNode, GraphEdge } from "@/lib/types"
 
 const TYPE_COLORS: Record<string, string> = {
-  transaction: "#F59E0B",
-  card:        "#06B6D4",
-  customer:    "#8B5CF6",
-  case:        "#EF4444",
-  document:    "#64748B",
-  customer_ev: "#10B981",
-  graph:       "#06B6D4",
-  unknown:     "#475569",
+  transaction: "#4FD1E8",
+  card:        "#D9A441",
+  customer:    "#F2F1ED",
+  device:      "#8B8D96",
+  case:        "#E5484D",
+  policy:      "#E8C547",
+  evidence:    "#3DD68C",
 }
 
-function inferNodeType(id: string, source: string): string {
+function inferType(id: string): GraphNode["type"] {
+  if (!id) return "evidence"
+  if (/^[A-Z]{2}-\d+$/.test(id) || id.startsWith("HHG-")) return "case"
   if (id.startsWith("C") && id.includes("-K")) return "card"
-  if (id.startsWith("C") && /^C\d+$/.test(id)) return "customer"
-  if (id.startsWith("CC-") || id.startsWith("HHG-")) return "case"
+  if (/^C\d+$/.test(id)) return "customer"
   if (/^\d{7,}$/.test(id)) return "transaction"
-  return source === "graph" ? "graph" : source === "customer" ? "customer_ev" : "document"
+  if (id.toLowerCase().includes("device") || id.toLowerCase().includes("proxy")) return "device"
+  return "evidence"
 }
 
-function buildGraph(evidence: EvidenceItem[]) {
-  const nodes = new Map<string, Node>()
-  const edges: Edge[] = []
-  const W = 680, H = 380, cx = W / 2, cy = H / 2
+function safeN(v: number | undefined, fallback: number): number {
+  return isFinite(v as number) ? (v as number) : fallback
+}
 
-  // Central node — the investigation
-  nodes.set("__inv__", { id: "__inv__", label: "INVESTIGATION", type: "transaction", x: cx, y: cy, vx: 0, vy: 0 })
+function buildGraph(evidence: EvidenceItem[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const nodeMap = new Map<string, GraphNode>()
+  const edges: GraphEdge[] = []
+  const seen  = new Set<string>()
 
-  for (const ev of evidence) {
+  nodeMap.set("__inv__", { id: "__inv__", label: "CASE", type: "case", x: 0, y: 0, vx: 0, vy: 0 })
+
+  for (const ev of evidence.slice(0, 30)) {
     for (const eid of ev.entity_ids) {
-      if (!nodes.has(eid)) {
+      if (!eid) continue
+      const short = eid.length > 12 ? eid.slice(0,10)+"…" : eid
+      if (!nodeMap.has(eid)) {
         const angle = Math.random() * Math.PI * 2
-        const dist  = 80 + Math.random() * 120
-        nodes.set(eid, {
-          id: eid, label: eid.length > 12 ? eid.slice(0, 10) + "…" : eid,
-          type: inferNodeType(eid, ev.source),
-          x: cx + Math.cos(angle) * dist,
-          y: cy + Math.sin(angle) * dist,
-          vx: 0, vy: 0,
+        const dist  = 80 + Math.random() * 110
+        nodeMap.set(eid, {
+          id: eid, label: short, type: inferType(eid),
+          x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, vx: 0, vy: 0,
         })
       }
-      if (!edges.some(e => e.s === "__inv__" && e.t === eid))
-        edges.push({ s: "__inv__", t: eid })
-    }
-    // edges between entity_ids in same evidence
-    for (let i = 0; i < ev.entity_ids.length - 1; i++) {
-      const a = ev.entity_ids[i], b = ev.entity_ids[i + 1]
-      if (!edges.some(e => (e.s === a && e.t === b) || (e.s === b && e.t === a)))
-        edges.push({ s: a, t: b })
-    }
-  }
-
-  return { nodes: Array.from(nodes.values()), edges }
-}
-
-export function EvidenceGraph({ evidence }: { evidence: EvidenceItem[]; caseId: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const frameRef  = useRef<number>(0)
-  const graphRef  = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null)
-  const tickRef   = useRef(0)
-
-  const builtGraph = useMemo(() => buildGraph(evidence.slice(0, 20)), [evidence])
-
-  useEffect(() => {
-    graphRef.current = { nodes: builtGraph.nodes.map(n => ({ ...n })), edges: builtGraph.edges }
-  }, [builtGraph])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-
-    function resize() {
-      if (!canvas) return
-      canvas.width  = canvas.offsetWidth
-      canvas.height = canvas.offsetHeight
-    }
-    resize()
-    window.addEventListener("resize", resize)
-
-    function simulate(nodes: Node[], edges: Edge[]) {
-      const W = canvas!.offsetWidth || 680
-      const H = canvas!.offsetHeight || 380
-      const cx = W / 2, cy = H / 2
-
-      // repulsion
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[j].x - nodes[i].x
-          const dy = nodes[j].y - nodes[i].y
-          const dist = Math.sqrt(dx * dx + dy * dy) + 0.01
-          if (dist < 120) {
-            const f = (120 - dist) / dist * 0.4
-            nodes[i].vx -= dx * f * 0.1
-            nodes[i].vy -= dy * f * 0.1
-            nodes[j].vx += dx * f * 0.1
-            nodes[j].vy += dy * f * 0.1
-          }
-        }
-        // center gravity for non-center nodes
-        if (nodes[i].id !== "__inv__") {
-          nodes[i].vx += (cx - nodes[i].x) * 0.002
-          nodes[i].vy += (cy - nodes[i].y) * 0.002
-        }
-        // edge spring
-        for (const e of edges) {
-          if (e.s === nodes[i].id || e.t === nodes[i].id) {
-            const other = nodes.find(n => n.id === (e.s === nodes[i].id ? e.t : e.s))
-            if (other) {
-              const dx = other.x - nodes[i].x
-              const dy = other.y - nodes[i].y
-              const dist = Math.sqrt(dx * dx + dy * dy) + 0.01
-              const target = nodes[i].id === "__inv__" ? 140 : 90
-              const f = (dist - target) / dist * 0.05
-              nodes[i].vx += dx * f
-              nodes[i].vy += dy * f
-            }
-          }
-        }
-        // dampen + clamp
-        nodes[i].vx *= 0.85
-        nodes[i].vy *= 0.85
-        nodes[i].x += nodes[i].vx
-        nodes[i].y += nodes[i].vy
-        nodes[i].x = Math.max(30, Math.min(W - 30, nodes[i].x))
-        nodes[i].y = Math.max(30, Math.min(H - 30, nodes[i].y))
+      const edgeKey = `__inv__::${eid}`
+      if (!seen.has(edgeKey)) {
+        seen.add(edgeKey)
+        edges.push({ source: "__inv__", target: eid })
       }
     }
+    for (let i = 0; i < ev.entity_ids.length - 1; i++) {
+      const a = ev.entity_ids[i], b = ev.entity_ids[i + 1]
+      if (!a || !b) continue
+      const k = [a,b].sort().join("::")
+      if (!seen.has(k)) {
+        seen.add(k)
+        edges.push({ source: a, target: b })
+      }
+    }
+  }
+  return { nodes: Array.from(nodeMap.values()), edges }
+}
+
+interface Props {
+  evidence: EvidenceItem[]
+  onNodeClick?: (nodeId: string) => void
+}
+
+export function EvidenceGraph({ evidence, onNodeClick }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const frameRef  = useRef(0)
+  const nodesRef  = useRef<GraphNode[]>([])
+  const edgesRef  = useRef<GraphEdge[]>([])
+  const tickRef   = useRef(0)
+  const mounted   = useRef(true)
+
+  const built = useMemo(() => buildGraph(evidence), [evidence])
+
+  // Reinitialise nodes/edges whenever evidence changes
+  useEffect(() => {
+    nodesRef.current = built.nodes.map(n => ({ ...n }))
+    edgesRef.current = built.edges
+    tickRef.current  = 0
+  }, [built])
+
+  const simulate = useCallback((nodes: GraphNode[], edges: GraphEdge[], W: number, H: number) => {
+    const cx = W / 2, cy = H / 2
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]
+      n.vx = safeN(n.vx, 0)
+      n.vy = safeN(n.vy, 0)
+      n.x  = safeN(n.x, cx)
+      n.y  = safeN(n.y, cy)
+
+      if (n.id !== "__inv__") {
+        n.vx += (cx - n.x) * 0.0015
+        n.vy += (cy - n.y) * 0.0015
+      }
+      for (let j = i + 1; j < nodes.length; j++) {
+        const m = nodes[j]
+        m.x = safeN(m.x, cx); m.y = safeN(m.y, cy)
+        const dx = m.x - n.x, dy = m.y - n.y
+        const d  = Math.sqrt(dx*dx + dy*dy) + 0.1
+        if (d < 110) {
+          const f = (110 - d) / d * 0.35
+          n.vx -= dx * f * 0.08; n.vy -= dy * f * 0.08
+          m.vx = safeN(m.vx, 0) + dx * f * 0.08
+          m.vy = safeN(m.vy, 0) + dy * f * 0.08
+        }
+      }
+      for (const e of edges) {
+        const sid = typeof e.source === "string" ? e.source : (e.source as GraphNode).id
+        const tid = typeof e.target === "string" ? e.target : (e.target as GraphNode).id
+        if (sid === n.id || tid === n.id) {
+          const other = nodes.find(x => x.id === (sid === n.id ? tid : sid))
+          if (other) {
+            other.x = safeN(other.x, cx); other.y = safeN(other.y, cy)
+            const dx = other.x - n.x, dy = other.y - n.y
+            const d  = Math.sqrt(dx*dx + dy*dy) + 0.1
+            const tgt = n.id === "__inv__" ? 130 : 85
+            const f   = (d - tgt) / d * 0.04
+            n.vx += dx * f; n.vy += dy * f
+          }
+        }
+      }
+      n.vx *= 0.88; n.vy *= 0.88
+      n.x = Math.max(20, Math.min(W - 20, n.x + n.vx))
+      n.y = Math.max(20, Math.min(H - 20, n.y + n.vy))
+    }
+  }, [])
+
+  useEffect(() => {
+    mounted.current = true
+    const canvas = canvasRef.current
+    if (!canvas) return
+    let ctx: CanvasRenderingContext2D | null
+    try { ctx = canvas.getContext("2d") } catch { return }
+    if (!ctx) return
+
+    const resize = () => { if (canvas) { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight } }
+    resize()
+    const ro = new ResizeObserver(resize); ro.observe(canvas)
+    const handleVis = () => {
+      if (document.hidden) cancelAnimationFrame(frameRef.current)
+      else frameRef.current = requestAnimationFrame(draw)
+    }
+    document.addEventListener("visibilitychange", handleVis)
 
     function draw() {
-      if (!canvas || !ctx || !graphRef.current) return
+      if (!canvas || !ctx || !mounted.current) return
       tickRef.current++
-      const { nodes, edges } = graphRef.current
       const W = canvas.width, H = canvas.height
+      if (!W || !H) { frameRef.current = requestAnimationFrame(draw); return }
 
       ctx.clearRect(0, 0, W, H)
+      const cx = W / 2, cy = H / 2
 
-      // Simulate physics
-      simulate(nodes, edges)
+      const nodes = nodesRef.current
+      const edges = edgesRef.current
 
+      if (!nodes.length) {
+        ctx.fillStyle = "rgba(139,141,150,0.35)"
+        ctx.font = "11px 'JetBrains Mono',monospace"
+        ctx.textAlign = "center"
+        ctx.fillText("No graph evidence returned for this case", cx, cy)
+        frameRef.current = requestAnimationFrame(draw); return
+      }
+
+      simulate(nodes, edges, W, H)
       const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
       // Edges
       for (let i = 0; i < edges.length; i++) {
-        const a = nodeMap.get(edges[i].s), b = nodeMap.get(edges[i].t)
+        const sid = typeof edges[i].source === "string" ? edges[i].source as string : (edges[i].source as GraphNode).id
+        const tid = typeof edges[i].target === "string" ? edges[i].target as string : (edges[i].target as GraphNode).id
+        const a = nodeMap.get(sid), b = nodeMap.get(tid)
         if (!a || !b) continue
-        const phase = (tickRef.current * 0.8 + i * 30) % 60
-        const alpha = 0.15 + 0.1 * Math.sin(tickRef.current * 0.02 + i)
+        const ax = safeN(a.x, cx), ay = safeN(a.y, cy)
+        const bx = safeN(b.x, cx), by = safeN(b.y, cy)
         ctx.save()
-        ctx.globalAlpha = alpha
-        ctx.strokeStyle = "#06B6D4"
-        ctx.lineWidth = 0.75
-        ctx.setLineDash([4, 6])
-        ctx.lineDashOffset = -phase * 0.3
-        ctx.beginPath()
-        ctx.moveTo(a.x, a.y)
-        ctx.lineTo(b.x, b.y)
-        ctx.stroke()
+        ctx.globalAlpha = 0.18 + 0.07 * Math.sin(tickRef.current * 0.02 + i)
+        ctx.strokeStyle = "#4FD1E8"; ctx.lineWidth = 0.8
+        ctx.setLineDash([4, 7]); ctx.lineDashOffset = -(tickRef.current + i * 18) % 60 * 0.25
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke()
         ctx.restore()
       }
 
       // Nodes
       for (const n of nodes) {
-        const col = TYPE_COLORS[n.type] ?? "#475569"
-        const isCenter = n.id === "__inv__"
-        const r = isCenter ? 18 : 8
+        const nx = safeN(n.x, cx), ny = safeN(n.y, cy)
+        const col = TYPE_COLORS[n.type] ?? "#8B8D96"
+        const isCtr = n.id === "__inv__"
+        const r = isCtr ? 16 : 7
 
-        // Glow
-        const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3)
-        glow.addColorStop(0, col + "33")
-        glow.addColorStop(1, "transparent")
-        ctx.fillStyle = glow
-        ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2); ctx.fill()
+        // Guard: only draw glow if coords are finite
+        if (isFinite(nx) && isFinite(ny) && isFinite(r)) {
+          const glow = ctx.createRadialGradient(nx, ny, 0, nx, ny, r * 3)
+          glow.addColorStop(0, col + "30"); glow.addColorStop(1, "transparent")
+          ctx.fillStyle = glow
+          ctx.beginPath(); ctx.arc(nx, ny, r * 3, 0, Math.PI*2); ctx.fill()
 
-        // Circle
-        ctx.fillStyle = col + (isCenter ? "CC" : "99")
-        ctx.strokeStyle = col
-        ctx.lineWidth = isCenter ? 1.5 : 1
-        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
-        ctx.fill(); ctx.stroke()
+          ctx.beginPath(); ctx.arc(nx, ny, r, 0, Math.PI*2)
+          ctx.fillStyle = col + (isCtr ? "CC" : "88"); ctx.fill()
+          ctx.strokeStyle = col; ctx.lineWidth = isCtr ? 1.5 : 1; ctx.stroke()
 
-        // Label
-        ctx.fillStyle = isCenter ? "#FCD34D" : "#94A3B8"
-        ctx.font = `${isCenter ? 9 : 7}px 'IBM Plex Mono', monospace`
-        ctx.textAlign = "center"
-        ctx.fillText(n.label, n.x, n.y + r + 10)
+          ctx.fillStyle = isCtr ? "#D9A441" : "#8B8D96"
+          ctx.font = `${isCtr ? 9 : 7}px 'JetBrains Mono',monospace`
+          ctx.textAlign = "center"
+          ctx.fillText(n.label, nx, ny + r + 10)
+        }
       }
-
       frameRef.current = requestAnimationFrame(draw)
     }
 
     frameRef.current = requestAnimationFrame(draw)
     return () => {
+      mounted.current = false
       cancelAnimationFrame(frameRef.current)
-      window.removeEventListener("resize", resize)
+      ro.disconnect()
+      document.removeEventListener("visibilitychange", handleVis)
     }
-  }, [])
+  }, [simulate])
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!onNodeClick) return
+    const canvas = canvasRef.current; if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top
+    for (const n of nodesRef.current) {
+      const dx = safeN(n.x, 0) - mx, dy = safeN(n.y, 0) - my
+      if (Math.sqrt(dx*dx + dy*dy) < 18 && n.id !== "__inv__") {
+        onNodeClick(n.id); break
+      }
+    }
+  }, [onNodeClick])
 
   return (
-    <div className="relative w-full h-full min-h-[340px]">
-      <canvas ref={canvasRef} className="w-full h-full" />
-      {/* Legend */}
+    <div className="relative w-full h-full min-h-[220px]">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full cursor-crosshair"
+        onClick={handleClick}
+        aria-label="Evidence relationship graph"
+        role="img"
+      />
       <div className="absolute bottom-2 left-2 flex flex-wrap gap-2">
-        {Object.entries(TYPE_COLORS).slice(0, 5).map(([type, col]) => (
-          <div key={type} className="flex items-center gap-1 text-[9px] mono text-slate-500">
-            <div className="w-2 h-2 rounded-full" style={{ background: col }} />
-            {type}
+        {(["transaction","card","customer","case"] as const).map(t => (
+          <div key={t} className="flex items-center gap-1 font-mono-ui text-[9px] text-[#8B8D96]/50">
+            <div className="w-2 h-2 rounded-full" style={{ background: TYPE_COLORS[t] }} />
+            {t}
           </div>
         ))}
       </div>

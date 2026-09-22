@@ -1,24 +1,57 @@
 "use client"
-import { cn } from "@/lib/utils"
-import type { Verdict } from "@/lib/types"
+import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react"
+import { cn, verdictBg, verdictColor, formatProb, patternLabel } from "@/lib/utils"
+import type { Verdict, FraudPattern } from "@/lib/types"
 
-const MAP: Record<Verdict, { label: string; cls: string }> = {
-  fraud:      { label: "FRAUD",       cls: "bg-red-950/80 border-red-600/50 text-red-300" },
-  legitimate: { label: "LEGITIMATE",  cls: "bg-emerald-950/80 border-emerald-600/50 text-emerald-300" },
-  uncertain:  { label: "UNCERTAIN",   cls: "bg-amber-950/80 border-amber-500/50 text-amber-300" },
+interface Props {
+  verdict: Verdict | string | null | undefined
+  probability?: number | null
+  pattern?: FraudPattern | string | null
+  large?: boolean
+  className?: string
 }
 
-export function VerdictBadge({ verdict, probability, className }: {
-  verdict: Verdict
-  probability?: number
-  className?: string
-}) {
-  const { label, cls } = MAP[verdict] ?? MAP.uncertain
+const ICONS = {
+  fraud:      ShieldAlert,
+  legitimate: ShieldCheck,
+  uncertain:  ShieldQuestion,
+}
+
+export function VerdictBadge({ verdict, probability, pattern, large, className }: Props) {
+  const v   = (verdict ?? "uncertain") as Verdict
+  const Icon = ICONS[v] ?? ShieldQuestion
+  const labelMap: Record<string, string> = {
+    fraud:      "FRAUD",
+    legitimate: "LEGITIMATE",
+    uncertain:  "UNCERTAIN",
+  }
+  const label = labelMap[v] ?? String(verdict ?? "UNKNOWN").toUpperCase()
+
   return (
-    <div className={cn("inline-flex items-center gap-2 px-3 py-1.5 rounded border text-sm font-mono tracking-widest", cls, className)}>
-      {label}
-      {probability !== undefined && (
-        <span className="opacity-70 text-xs">{(probability * 100).toFixed(0)}%</span>
+    <div className={cn(
+      "inline-flex flex-col items-center gap-1 rounded-lg border px-4 py-3",
+      verdictBg(v),
+      large && "px-6 py-4",
+      className,
+    )}>
+      <div className={cn("flex items-center gap-2", verdictColor(v))}>
+        <Icon size={large ? 22 : 16} strokeWidth={2} aria-hidden />
+        <span className={cn(
+          "font-mono-ui font-bold tracking-widest",
+          large ? "text-lg" : "text-sm",
+        )}>
+          {label}
+        </span>
+      </div>
+      {probability != null && (
+        <span className="font-mono-ui text-xs opacity-70">
+          {formatProb(probability)} confidence
+        </span>
+      )}
+      {pattern != null && (
+        <span className="font-mono-ui text-[10px] uppercase tracking-wider opacity-50">
+          {patternLabel(pattern)}
+        </span>
       )}
     </div>
   )

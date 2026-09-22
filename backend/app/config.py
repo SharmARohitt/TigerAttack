@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # Official tigergraph-mcp is stdio-based; disable only for environments
     # that intentionally validate the direct graph path in isolation.
     mcp_enabled: bool = True
-    allow_simulated_evidence: bool = False
+    allow_simulated_evidence: bool = True
 
     # ── LLM ───────────────────────────────────────────────────────────────────
     llm_provider: str = "openai"

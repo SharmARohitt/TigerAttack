@@ -789,21 +789,58 @@ class FraudAgent:
     def _deterministic_probability(
         self, state: InvestigationState, pattern_result, risk
     ) -> dict[str, Any]:
-        """Compute fraud probability deterministically when LLM unavailable."""
-        p = risk.risk_score
-        # Boost if customer_report trigger
-        if state.trigger_type == "customer_report":
-            p = min(p + 0.25, 0.95)
-        # Boost if confirmed prior fraud
-        if any(c.get("outcome") == "confirmed_fraud" for c in state.prior_cases):
-            p = min(p + 0.10, 0.95)
-        # Pattern confidence
-        if pattern_result.pattern != FraudPattern.none:
-            p = max(p, pattern_result.confidence)
-        # No documented pattern is not evidence of legitimate activity. Keep
-        # the deterministic risk signal and expose the missing typology as
-        # uncertainty through the existing risk assessment fields.
-        return {"fraud_probability": round(p, 3), "tokens": 0}
+        """
+        Compute fraud probability when LLM is unavailable.
+
+        This must produce a CONTINUOUS score, not a clamped rule-table lookup.
+        It combines the signals already computed by RiskEngine (risk.risk_score)
+        with pattern confidence using a weighted blend — no hardcoded ceiling per rule.
+
+        Weights are derived from the fraud policy signal hierarchy:
+          - risk.risk_score already aggregates: bank_model_score, customer_dispute,
+            prior_fraud, new_device, proxy, region anomaly, high_amount, etc.
+          - Pattern confidence is an independent signal (pattern_detector.py)
+          - We blend them; neither source alone determines the result
+
+        Policy R1 boundary (0.70) is used as the HIGH zone anchor.
+        Policy section 6 stopping criteria (0.85 with 2+ evidence) sets the
+        high-confidence ceiling, but we never clamp all cases to a single value.
+        """
+        # Base: RiskEngine already computed a weighted sum of triggered signals
+        base = risk.risk_score  # range: [0.05, 1.0], continuous
+
+        # Pattern confidence is an independent evidence source
+        # Blend with base: pattern gets 35% weight when it fires
+        pat_conf = pattern_result.confidence if pattern_result.pattern.value != "none" else 0.0
+        if pat_conf > 0:
+            blended = base * 0.65 + pat_conf * 0.35
+        else:
+            blended = base
+
+        # Apply a small calibration adjustment per trigger type based on policy guidance.
+        # These are *adjustments* that preserve continuity — not overrides.
+        # Policy R1: customer_report is a strong independent signal but not conclusive alone.
+        # The RiskEngine already includes customer_dispute weight=0.6 when trigger_type==
+        # "customer_report", so we do NOT add another boost here — that was the original bug.
+        # Instead, we respect the RiskEngine output and only apply a modest confidence boost
+        # when prior confirmed fraud corroborates the trigger.
+        confirmed_prior_count = sum(
+            1 for c in state.prior_cases if c.get("outcome") == "confirmed_fraud"
+        )
+        if confirmed_prior_count > 0:
+            # Each confirmed prior case adds a small corroborating increment (diminishing)
+            # First prior: +0.05, second: +0.03, more: +0.02 each, max total +0.12
+            prior_boost = min(
+                0.05 + 0.03 * min(confirmed_prior_count - 1, 1)
+                + 0.02 * max(confirmed_prior_count - 2, 0),
+                0.12,
+            )
+            blended = blended + prior_boost
+
+        # Clamp to valid probability range — no artificial ceiling below 1.0
+        p = round(max(0.01, min(0.99, blended)), 3)
+
+        return {"fraud_probability": p, "tokens": 0}
 
     async def _call_llm(
         self, state: InvestigationState, ctx: dict, pattern_result, risk
@@ -931,44 +968,63 @@ class FraudAgent:
         self, state: InvestigationState, risk
     ) -> tuple[bool, EvidenceRequest | None]:
         """
-        Determine if more evidence is needed.
-        Returns (need_more, EvidenceRequest).
-        Policy R1: if probability < 0.70 and weak signal, verify.
+        Determine if more evidence is needed before reaching a verdict.
+
+        Policy basis:
+          R1 — verify before blocking on a weak single signal (fp < 0.70)
+          R2 — customer denial settles the question; no further evidence needed
+          R8 — escalate when uncertain AND exposure > $500
+
+        Gates:
+          - Never request evidence if fp >= 0.80 (strong fraud) or fp <= 0.20 (strong clear).
+          - For customer_report triggers, request confirmation only when fp is
+            genuinely ambiguous (0.25–0.75); a denial + fp > 0.75 is already decisive.
+          - For risk-score triggers, request step-up only when fp < 0.70 AND weak signals.
         """
         fp = state.fraud_probability
         uncertainty = risk.uncertainty_flags
 
-        # Customer report: ask for confirmation if not already done
-        # Authorization remains unresolved even when the model probability is
-        # high; customer validation can change the permitted action.
-        if state.trigger_type == "customer_report" and not state.evidence_received:
+        # Already decided — no evidence request needed
+        if fp >= 0.80 or fp <= 0.20:
+            return False, None
+
+        # Customer report in the ambiguous zone: verify authorization
+        # (Policy R1 — do not block on a single signal below 0.70 without verification)
+        if (state.trigger_type == "customer_report"
+                and not state.evidence_received
+                and 0.25 <= fp <= 0.75):
             return True, EvidenceRequest(
                 type=EvidenceRequestType.customer_validation,
                 asked_after_step=state.step,
                 assumed_response="",
-                reason="Authorization is unresolved; a verified customer response can change the permitted action.",
+                reason=(
+                    "Authorization is unresolved; a verified customer response "
+                    "resolves ambiguity and determines the permitted action (Policy R2/R3)."
+                ),
             )
 
-        # Never request generic evidence if we are already certain.
-        if fp >= 0.85 or fp <= 0.15:
-            return False, None
-
-        # R1: single weak signal
+        # R1: single weak signal + below-blocking threshold
         if fp < 0.70 and risk.evidence_count <= 1:
             return True, EvidenceRequest(
                 type=EvidenceRequestType.step_up_auth,
                 asked_after_step=state.step,
                 assumed_response="",
-                reason="Step-up authentication can distinguish authorized activity from account misuse.",
+                reason=(
+                    "Single signal below blocking threshold; step-up can distinguish "
+                    "authorized activity from account misuse (Policy R1)."
+                ),
             )
 
-        # High uncertainty flags
-        if len(uncertainty) >= 2 and 0.40 <= fp <= 0.80:
+        # R8: high uncertainty flags in the mid-range AND significant exposure
+        if len(uncertainty) >= 2 and 0.40 <= fp <= 0.70 and state.exposure_usd > 500:
             return True, EvidenceRequest(
                 type=EvidenceRequestType.analyst_info,
                 asked_after_step=state.step,
                 assumed_response="",
-                reason="Additional analyst information may resolve material uncertainty flags.",
+                reason=(
+                    "Multiple unresolved uncertainty flags with exposure > $500; "
+                    "analyst information required before action (Policy R8)."
+                ),
             )
 
         return False, None
@@ -1090,31 +1146,64 @@ class FraudAgent:
     # ── Verdict finalization ──────────────────────────────────────────────────
 
     def _finalize_verdict(self, state: InvestigationState) -> None:
-        if state.stop_reason == "AWAITING_EXTERNAL_EVIDENCE":
-            state.verdict = Verdict.uncertain
-            state.status = CaseStatus.escalated
-            return
+        """
+        Set case.verdict and case.status from fraud_probability.
+
+        Thresholds anchored to Fraud Policy v1.0 (Datasets/README.md):
+
+          HIGH_THRESHOLD = 0.70
+            Policy R1: "if fraud probability is below 0.70, recommend VERIFY before block."
+            This means >= 0.70 is the decisive FRAUD zone where action is warranted.
+
+          LOW_THRESHOLD = 0.30
+            Policy R8: "escalate when uncertain and exposure > $500."
+            Cases below 0.30 have insufficient evidence for fraud — they land in the
+            legitimate/low-risk zone. The policy does not state an exact number;
+            0.30 is a defensible lower bound consistent with "monitoring threshold"
+            language in the policy (MONITOR_CARD actions are recommended at mid-range).
+            Cases between 0.30 and 0.70 are genuinely UNCERTAIN.
+
+          0.30 < fp < 0.70 → UNCERTAIN (triggers evidence-request lifecycle if applicable)
+
+        Note: customer_response overrides probability-based logic (direct evidence).
+        Note: AWAITING_EXTERNAL_EVIDENCE only holds when no simulated/received response exists.
+        """
+        # Constants — defined here for visibility, not hidden in magic numbers elsewhere
+        HIGH_THRESHOLD = 0.70
+        LOW_THRESHOLD  = 0.30
+
         fp = state.fraud_probability
         evidence_responses = [r.get("outcome") for r in state.evidence_received]
 
+        # 1. Direct customer/external responses override probability
         if "denied" in evidence_responses:
             state.verdict = Verdict.fraud
-            state.status = CaseStatus.closed_fraud
-        elif "confirmed" in evidence_responses:
+            state.status  = CaseStatus.closed_fraud
+            return
+        if "confirmed" in evidence_responses:
             state.verdict = Verdict.legitimate
-            state.status = CaseStatus.closed_legitimate
-        elif fp >= 0.80:
+            state.status  = CaseStatus.closed_legitimate
+            return
+
+        # 2. Still genuinely awaiting external evidence
+        if state.stop_reason == "AWAITING_EXTERNAL_EVIDENCE" and not state.evidence_received:
+            state.verdict = Verdict.uncertain
+            state.status  = CaseStatus.escalated
+            return
+
+        # 3. Probability-based three-way classification
+        if fp >= HIGH_THRESHOLD:
             state.verdict = Verdict.fraud
-            state.status = CaseStatus.closed_fraud
-        elif fp <= 0.20:
+            state.status  = CaseStatus.closed_fraud
+        elif fp <= LOW_THRESHOLD:
             state.verdict = Verdict.legitimate
-            state.status = CaseStatus.closed_legitimate
+            state.status  = CaseStatus.closed_legitimate
         elif any(a.action.value == "ESCALATE_TO_ANALYST" for a in state.final_actions):
             state.verdict = Verdict.uncertain
-            state.status = CaseStatus.escalated
+            state.status  = CaseStatus.escalated
         else:
             state.verdict = Verdict.uncertain
-            state.status = CaseStatus.open
+            state.status  = CaseStatus.open
 
     # ── Graph memory write ────────────────────────────────────────────────────
 

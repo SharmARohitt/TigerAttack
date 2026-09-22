@@ -1,137 +1,137 @@
 "use client"
-import { useEffect, useRef, useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import type { EvidenceItem } from "@/lib/types"
-import { sourceIcon } from "@/lib/utils"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { EvidenceItem } from "@/lib/types"
 
-interface StreamEntry {
-  id: string
-  ts: number
-  label: string
-  source: string
-  ref: string
-  entity_ids: string[]
-  expanded: boolean
+const SRC_STYLES: Record<string, string> = {
+  graph:    "bg-[#4FD1E8]/10 border-[#4FD1E8]/30 text-[#4FD1E8]",
+  document: "bg-white/05    border-white/15    text-[#8B8D96]",
+  customer: "bg-violet-500/10 border-violet-500/30 text-violet-300",
+  external: "bg-[#D9A441]/10 border-[#D9A441]/30 text-[#D9A441]",
 }
 
-function buildEntries(evidence: EvidenceItem[], offset = 0): StreamEntry[] {
-  return evidence.map((ev, i) => ({
-    id: `ev-${i}`,
-    ts: offset + i * 180 + Math.random() * 80,
-    label: ev.claim,
-    source: ev.source,
-    ref: ev.ref,
-    entity_ids: ev.entity_ids,
-    expanded: false,
-  }))
+interface Props {
+  evidence: EvidenceItem[]
+  focusedEntityId?: string | null
 }
 
-const SOURCE_COLORS: Record<string, string> = {
-  graph:    "text-cyan-400 border-cyan-800/50",
-  document: "text-slate-400 border-slate-700/50",
-  customer: "text-violet-400 border-violet-800/50",
-  external: "text-amber-400 border-amber-800/50",
-}
+export function EvidenceStream({ evidence, focusedEntityId }: Props) {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const focusRef = useRef<HTMLDivElement | null>(null)
 
-export function EvidenceStream({ evidence, streaming }: { evidence: EvidenceItem[]; streaming?: boolean }) {
-  const [visible, setVisible] = useState<StreamEntry[]>([])
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const listRef = useRef<HTMLDivElement>(null)
-  const entries = useRef(buildEntries(evidence))
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    entries.current = buildEntries(evidence)
-    setVisible([])
-
-    if (!streaming) {
-      setVisible(entries.current)
-      return
-    }
-
-    let i = 0
-    function addNext() {
-      if (i >= entries.current.length) return
-      setVisible(prev => [...prev, entries.current[i]])
-      i++
-      timerRef.current = setTimeout(addNext, 220 + Math.random() * 160)
-    }
-    timerRef.current = setTimeout(addNext, 300)
-    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evidence, streaming])
-
-  // Auto-scroll
-  useEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
-  }, [visible])
-
-  const toggle = (id: string) =>
+  const toggle = (i: number) =>
     setExpanded(prev => {
       const n = new Set(prev)
-      if (n.has(id)) { n.delete(id) } else { n.add(id) }
+      if (n.has(i)) { n.delete(i) } else { n.add(i) }
       return n
     })
 
-  const fmtTs = (ms: number) => {
-    const s = ms / 1000
-    return `${Math.floor(s / 60).toString().padStart(2,"0")}:${(s % 60).toFixed(2).padStart(5,"0")}`
+  // Scroll focused item into view
+  useEffect(() => {
+    if (focusedEntityId && focusRef.current) {
+      focusRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    }
+  }, [focusedEntityId])
+
+  if (!evidence.length) {
+    return (
+      <div className="flex items-center justify-center h-32 font-mono-ui text-xs text-[#8B8D96]/40">
+        No graph evidence returned for this case
+      </div>
+    )
   }
 
   return (
-    <div ref={listRef} className="h-full overflow-y-auto space-y-1 pr-1">
+    <div className="space-y-1.5 p-1">
       <AnimatePresence initial={false}>
-        {visible.map(entry => {
-          const isExp = expanded.has(entry.id)
-          const cols = SOURCE_COLORS[entry.source] ?? SOURCE_COLORS.external
+        {evidence.map((ev, i) => {
+          const isFocused = focusedEntityId
+            ? ev.entity_ids.includes(focusedEntityId)
+            : false
+          const isExpanded = expanded.has(i)
+          const srcStyle = SRC_STYLES[ev.source] ?? SRC_STYLES.document
+
           return (
             <motion.div
-              key={entry.id}
-              initial={{ opacity: 0, x: -10 }}
+              key={i}
+              initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.22 }}
+              transition={{ duration: 0.18, delay: Math.min(i * 0.04, 0.6) }}
+              ref={isFocused ? focusRef : null}
               className={cn(
-                "rounded border cursor-pointer transition-colors duration-150",
-                "bg-[#0D1117]/80 hover:bg-[#111820]/90",
-                isExp ? "border-white/10" : "border-white/5"
+                "rounded-lg border transition-all duration-200 cursor-pointer",
+                isFocused
+                  ? "border-[#D9A441]/50 bg-[#D9A441]/06 glow-amber"
+                  : "border-white/08 bg-[#14151A]/60 hover:border-white/14"
               )}
-              onClick={() => toggle(entry.id)}
+              onClick={() => toggle(i)}
             >
-              <div className="flex items-start gap-2 px-3 py-2">
-                <span className="mono text-[9px] text-slate-600 shrink-0 mt-0.5 w-14">{fmtTs(entry.ts)}</span>
-                <span className={cn("text-xs shrink-0 mt-0.5", cols.split(" ")[0])}>
-                  {sourceIcon(entry.source)}
+              <div className="flex items-start gap-2.5 px-3 py-2.5">
+                {/* Source badge */}
+                <span className={cn(
+                  "font-mono-ui text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 mt-0.5",
+                  srcStyle,
+                )}>
+                  {ev.source}
                 </span>
-                <span className="text-xs text-slate-300 leading-snug flex-1 line-clamp-2">{entry.label}</span>
-                <span className="text-slate-700 text-[10px] shrink-0 mt-0.5">{isExp ? "▲" : "▼"}</span>
+
+                {/* Claim */}
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    "text-[11px] leading-snug",
+                    isExpanded ? "text-[#F2F1ED]" : "text-[#F2F1ED]/80 line-clamp-2",
+                  )}>
+                    {ev.claim}
+                  </p>
+                  {!isExpanded && ev.ref && (
+                    <span className="font-mono-ui text-[9px] text-[#8B8D96]/50 mt-0.5 block truncate">
+                      {ev.ref}
+                    </span>
+                  )}
+                </div>
+
+                {/* Expand toggle */}
+                <span className="text-[#8B8D96]/40 shrink-0 mt-0.5" aria-hidden>
+                  {isExpanded
+                    ? <ChevronDown size={11} />
+                    : <ChevronRight size={11} />}
+                </span>
               </div>
-              {isExp && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className={cn("px-3 pb-2 border-t mono text-[9px] space-y-1", cols.split(" ")[1])}
-                >
-                  <div className="text-slate-500 pt-1">SOURCE: <span className="text-slate-400 uppercase">{entry.source}</span></div>
-                  <div className="text-slate-500">REF: <span className="text-slate-400">{entry.ref}</span></div>
-                  {entry.entity_ids.length > 0 && (
-                    <div className="text-slate-500">ENTITIES:
-                      <span className="text-cyan-500/70 ml-1">{entry.entity_ids.join(" → ")}</span>
+
+              {/* Expanded detail */}
+              {isExpanded && (
+                <div className="px-3 pb-3 space-y-1.5 border-t border-white/06 pt-2">
+                  <div className="font-mono-ui text-[9px] text-[#8B8D96]/50">
+                    REF: <span className="text-[#8B8D96]">{ev.ref || "—"}</span>
+                  </div>
+                  {ev.entity_ids.length > 0 && (
+                    <div>
+                      <div className="font-mono-ui text-[9px] text-[#8B8D96]/50 mb-1">ENTITIES</div>
+                      <div className="flex flex-wrap gap-1">
+                        {ev.entity_ids.map(eid => (
+                          <span
+                            key={eid}
+                            className={cn(
+                              "font-mono-ui text-[8px] px-1.5 py-0.5 rounded border",
+                              eid === focusedEntityId
+                                ? "bg-[#D9A441]/20 border-[#D9A441]/40 text-[#D9A441]"
+                                : "bg-white/04 border-white/10 text-[#8B8D96]",
+                            )}
+                          >
+                            {eid}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </motion.div>
+                </div>
               )}
             </motion.div>
           )
         })}
       </AnimatePresence>
-      {visible.length === 0 && (
-        <div className="flex items-center justify-center h-full text-slate-700 text-xs mono">
-          AWAITING EVIDENCE…
-        </div>
-      )}
     </div>
   )
 }

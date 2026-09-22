@@ -1,55 +1,59 @@
 "use client"
-import { motion } from "framer-motion"
+import { FileText } from "lucide-react"
+import { formatUSD } from "@/lib/utils"
 import type { SAR } from "@/lib/types"
-import { formatCurrency } from "@/lib/utils"
-import { cn } from "@/lib/utils"
 
 export function SARPanel({ sar }: { sar: SAR }) {
+  if (!sar) {
+    return (
+      <div className="p-4 font-mono-ui text-xs text-[#8B8D96]/40">
+        SAR data not available
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="p-4 space-y-4">
       {/* Filing status */}
-      <div className={cn(
-        "rounded border p-3",
+      <div className={`rounded-lg border p-4 ${
         sar.file
-          ? "border-red-700/40 bg-red-950/15"
-          : "border-white/5 bg-[#0D1117]/60"
-      )}>
-        <div className="flex items-center gap-2 mb-1">
-          <div className={cn("w-2.5 h-2.5 rounded-full", sar.file ? "bg-red-500" : "bg-slate-700")} />
-          <span className={cn("mono text-xs font-semibold", sar.file ? "text-red-400" : "text-slate-500")}>
+          ? "border-[#E5484D]/40 bg-[#E5484D]/06"
+          : "border-[#3DD68C]/30 bg-[#3DD68C]/05"
+      }`}>
+        <div className="flex items-center gap-2 mb-2">
+          <div className={`w-2.5 h-2.5 rounded-full ${sar.file ? "bg-[#E5484D]" : "bg-[#3DD68C]"}`} />
+          <span className={`font-mono-ui text-xs font-semibold tracking-wider ${
+            sar.file ? "text-[#E5484D]" : "text-[#3DD68C]"
+          }`}>
             {sar.file ? "SAR — FILE REPORT" : "SAR NOT REQUIRED"}
           </span>
         </div>
-        <p className="text-slate-500 text-[10px] leading-relaxed">{sar.reason}</p>
+        <p className="text-[11px] text-[#F2F1ED]/60 leading-relaxed">{sar.reason}</p>
       </div>
 
       {sar.file && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="space-y-2"
-        >
-          {/* Metadata */}
+        <>
+          {/* Metadata grid */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded border border-white/5 bg-[#0D1117]/60 p-2">
-              <div className="mono text-[8px] text-slate-600 mb-0.5">TOTAL AMOUNT</div>
-              <div className="mono text-xs text-red-300">{formatCurrency(sar.total_amount_usd)}</div>
+            <div className="rounded border border-white/08 bg-[#14151A]/60 px-2 py-2">
+              <div className="font-mono-ui text-[8px] text-[#8B8D96]/50 mb-0.5">TOTAL AMOUNT</div>
+              <div className="font-mono-ui text-sm text-[#E5484D]">{formatUSD(sar.total_amount_usd)}</div>
             </div>
-            <div className="rounded border border-white/5 bg-[#0D1117]/60 p-2">
-              <div className="mono text-[8px] text-slate-600 mb-0.5">ACTIVITY DATES</div>
-              <div className="mono text-[10px] text-slate-300">
-                {sar.activity_dates.join(" → ") || "—"}
+            <div className="rounded border border-white/08 bg-[#14151A]/60 px-2 py-2">
+              <div className="font-mono-ui text-[8px] text-[#8B8D96]/50 mb-0.5">ACTIVITY DATES</div>
+              <div className="font-mono-ui text-[10px] text-[#F2F1ED]">
+                {sar.activity_dates?.join(" → ") || "—"}
               </div>
             </div>
           </div>
 
           {/* Subjects */}
-          {sar.subjects.length > 0 && (
-            <div className="rounded border border-white/5 bg-[#0D1117]/60 p-2">
-              <div className="mono text-[8px] text-slate-600 mb-1">SUBJECTS</div>
+          {sar.subjects?.length > 0 && (
+            <div className="rounded border border-white/08 bg-[#14151A]/60 px-3 py-2">
+              <div className="font-mono-ui text-[8px] text-[#8B8D96]/50 mb-1.5">SUBJECTS</div>
               <div className="flex flex-wrap gap-1">
                 {sar.subjects.map(s => (
-                  <span key={s} className="mono text-[9px] px-1.5 py-0.5 rounded bg-red-950/30 text-red-600/70 border border-red-900/20">
+                  <span key={s} className="font-mono-ui text-[8px] px-1.5 py-0.5 rounded bg-[#E5484D]/10 border border-[#E5484D]/20 text-[#E5484D]/80">
                     {s}
                   </span>
                 ))}
@@ -59,19 +63,25 @@ export function SARPanel({ sar }: { sar: SAR }) {
 
           {/* Narrative */}
           {sar.narrative && (
-            <div className="rounded border border-red-900/20 bg-red-950/10 p-3">
-              <div className="mono text-[8px] text-red-800 mb-2 tracking-widest">SAR NARRATIVE</div>
-              <p className="text-slate-400 text-[10px] leading-relaxed whitespace-pre-wrap">
-                {sar.narrative}
-              </p>
+            <div className="rounded border border-[#E5484D]/20 bg-[#E5484D]/04">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-[#E5484D]/15">
+                <FileText size={11} className="text-[#E5484D]/60" aria-hidden />
+                <span className="font-mono-ui text-[8px] text-[#E5484D]/60 uppercase tracking-wider">
+                  SAR NARRATIVE
+                </span>
+              </div>
+              <div className="px-3 py-3 max-h-64 overflow-y-auto">
+                <pre className="font-mono-ui text-[10px] text-[#F2F1ED]/65 whitespace-pre-wrap leading-relaxed">
+                  {sar.narrative}
+                </pre>
+              </div>
             </div>
           )}
 
-          <div className="mono text-[8px] text-red-900/60 pt-1">
-            This SAR is based solely on evidence retrieved during investigation.
-            Filing requires L2 (Fraud Manager) approval per policy.
-          </div>
-        </motion.div>
+          <p className="font-mono-ui text-[8px] text-[#E5484D]/40">
+            SAR filing requires L2 (Fraud Manager) approval per policy. All content sourced from investigation evidence only.
+          </p>
+        </>
       )}
     </div>
   )
